@@ -2,8 +2,8 @@ function [ spines, chorusCount, chorusElements ] = selectSpines( spines, numSpin
 %UNTITLED Summary of this function goes here
 %   Detailed explanation goes here
 % figure;i1 = subplot(1,1,1);imagesc(spines);set(i1, 'ydir', 'normal');colormap autumn;hold on;
-    deltaT = tspec(1);
-    deltaF = fspec(1);
+%     deltaT = tspec(1);
+%     deltaF = fspec(1);
 %     minSlope = tand(10);
 %     maxSlope = tand(80);
     chorusElements = struct();
@@ -18,11 +18,11 @@ function [ spines, chorusCount, chorusElements ] = selectSpines( spines, numSpin
             angle = atand(p(1));
             gof = sum((f - fp) .^ 2) / numel(f);
     %             plot(t, fp, 'k');
-            [~, first] = min(t);
-            [~, last] = max(t);
-            tdiff = (t(first) - t(last)) * deltaT;
-            fdiff = (fp(first) - fp(last)) * deltaF;
-            l = sqrt(tdiff ^ 2 + fdiff ^ 2);
+%             [~, first] = min(t);
+%             [~, last] = max(t);
+%             tdiff = (t(first) - t(last)) * deltaT;
+%             fdiff = (fp(first) - fp(last)) * deltaF;
+%             l = sqrt(tdiff ^ 2 + fdiff ^ 2);
             psdSum = 0;
             for j = 1:numel(f)
                 psdSum = psdSum + spect(f(j), t(j));
@@ -52,13 +52,12 @@ function [ spines, chorusCount, chorusElements ] = selectSpines( spines, numSpin
                 chorusCount = chorusCount + 1;
                 chorusElements(chorusCount).time = t;
                 chorusElements(chorusCount).freq = f;
-                chorusElements(chorusCount).sweeprate = angle * mu;
+                chorusElements(chorusCount).sweeprate = p(1) * mu;
                 chorusElements(chorusCount).chorusAngle = angle;
                 psdVec = zeros(size(f'));
                 for j = 1:numel(f)
                     psdVec(j) = imagefile(f(j), t(j));
                 end
-                [psdSum, l, gof, atand(p(1)), numel(f)]
                 chorusElements(chorusCount).psd = psdVec;
             end
         end
