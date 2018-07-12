@@ -6,7 +6,6 @@ function [totalRecordsBatch, batchCounts] = runBatch( startDate, stopDate, ppFil
 % cdfMasterFile is path to file containing structure of the cdf files
 
     % time to record batch processing time
-    t1 = tic;
     startDate = datetime(startDate, 'Format', 'yyyy-MM-dd');
     stopDate = datetime(stopDate, 'Format', 'yyyy-MM-dd');
 
@@ -33,8 +32,6 @@ function [totalRecordsBatch, batchCounts] = runBatch( startDate, stopDate, ppFil
     totalRecordsBatch = 0;
     
     for iDate = startDate:stopDate
-        % time to record burst processing time
-        t2 = tic;
 
         % set up image folders and filenames for day
         [ figFolder, summaryFigDay] = setupDayFigFolder( iDate, paramstring );
@@ -65,7 +62,11 @@ function [totalRecordsBatch, batchCounts] = runBatch( startDate, stopDate, ppFil
             % get file path for burst
             filename = filelist(iFile).name
             datafilename = sprintf('%s/%s', dataPath, filename);
-            load(datafilename);
+            burstVar = load(datafilename);
+            tspec = burstVar.tspec;
+            fspec = burstVar.fspec;
+            imagefile = burstVar.imagefile;
+            timestamp = burstVar.timestamp;
             
             % continue if in plasmapause interval
             if find(timestamp <= ppIntervals(:,2) & (timestamp + seconds(6)) > ppIntervals(:,1))
@@ -164,8 +165,6 @@ function [totalRecordsBatch, batchCounts] = runBatch( startDate, stopDate, ppFil
         totalRecordsBatch = totalRecordsBatch + totalRecordsDay;
         iDate
         totalRecordsDay
-        % stop timer
-        toc(t2)
     end % end of days loop
     % close all files
     fclose('all');
@@ -173,6 +172,5 @@ function [totalRecordsBatch, batchCounts] = runBatch( startDate, stopDate, ppFil
     % create summary histograms for batch
     showSummaryPanel(batchCounts, histEdges, summaryFigBatch);
     
-    totalRecordsBatch   
-    toc(t1)
+    totalRecordsBatch
 end

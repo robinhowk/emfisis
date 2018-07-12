@@ -45,7 +45,7 @@ function process_cdf(year, month)
                     BuData = BuSamples(burst_index, 1:end);
 
                     % spectrograms of samples
-                    [im, fspec, tspec, imagefile] = spectrogram(BuData, hanning(nfft), nfft/2, f, Fs, 'yaxis');
+                    [~, fspec, tspec, imagefile] = spectrogram(BuData, hanning(nfft), nfft/2, f, Fs, 'yaxis');
 
                     % save to mat file
                     mat_filename = sprintf('%s/%s_%03d_%s.mat', mat_folder, datestr, burst_index, instrument);
