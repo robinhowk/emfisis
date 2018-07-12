@@ -7,8 +7,10 @@ function [ spinesnew, spineSegments, numSegments ] = fitSpines( spines, spect, m
     
     spines = groupBranchpoints(spines);
     [spineSegments, numSegments, bpoints] = identifySegments(spines);
+    
     % process each spine.
     spinesnew = zeros(size(spines));
+    
     for i = 1:numSegments
         % create mask of current spine
         spineMask = spineSegments == i;
