@@ -46,3 +46,6 @@ other/
 
 # mat files for current research
 source_files/
+
+# parameter mat files
+r*_t*.mat
