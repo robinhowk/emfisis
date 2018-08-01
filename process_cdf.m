@@ -1,5 +1,5 @@
 function process_cdf(year, month)
-    addpath '../matlab_cdf364_patch-64';
+    addpath 'matlab_cdf364_patch-64';
 
     % Window size
     nfft = 1024;
@@ -31,7 +31,7 @@ function process_cdf(year, month)
                     BuSamples = spdfcdfread(cdf_path, 'Variable', 'BuSamples');
 
                     % location to store .mat files
-                    mat_folder = sprintf('data/mat/%d/%02d/%s', year, month, filelist_days(folder_index).name);
+                    mat_folder = sprintf('/scratch/rhowk/emfisis/mat/%d/%02d/%s', year, month, filelist_days(folder_index).name);
 
                     % create folder if it does not exist
                     if exist(mat_folder, 'dir') == 0
@@ -49,7 +49,7 @@ function process_cdf(year, month)
 
                     % save to mat file
                     mat_filename = sprintf('%s/%s_%03d_%s.mat', mat_folder, datestr, burst_index, instrument);
-                    save(mat_filename, 'fspec', 'imagefile', 'timestamp', 'tspec');
+                    save(mat_filename, 'fspec', 'imagefile', 'timestamp', 'tspec', 'BuData');
                     end
                 end
             end
