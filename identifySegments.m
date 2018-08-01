@@ -21,11 +21,20 @@ function [spineSegments, numSegments, bpoints] = identifySegments(spines)
     apoints(apoints == 1 & spines == 0) = 0;
     segments = spines & ~bpoints;
     segments = segments & ~apoints;
-    spineSegments = zeros(size(spines));
-    numSegments = 0;
+    [spineSegments, ~] = bwlabel(segments);
+    
+    for i = 1:numel(fb)
+        label = spineSegments(fb(i), tb(i));
+        spine = spineSegments == label;
+        spineSegments(spine) = 0;
+    end
+    
+    [spineSegments, numSegments] = bwlabel(spineSegments);
+    segments(spineSegments > 0) = 0;
+    
+    
     [f, t] = find(apoints == 1);
     for i = 1:numel(f)
-
         segments(f(i), t(i)) = 1;
         [spineLabels, ~] = bwlabel(segments);
         label = spineLabels(f(i), t(i));
@@ -42,5 +51,5 @@ function [spineSegments, numSegments, bpoints] = identifySegments(spines)
         end
 
         segments(f(i), t(i)) = 0;
-    end    
+    end     
 end

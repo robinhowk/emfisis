@@ -12,10 +12,26 @@ function [ spineMask, len, angle ] = processSpine( spineMask, spect, minSNR  )
     end
     
     % fit line to spine
-    [f, t] = ind2sub([numrows, numcols], spineInd);
-    p = polyfit(t, f, 3);
-    fp = polyval(p, t);
-    fpi = round(fp);
+    [f, t] = find(spineMask == 1);
+    if numel(f) <= 4
+        ptemp = polyfit(t,f,1);
+        p = zeros(1,4);
+        p(3:4) = ptemp;
+        fp = polyval(p, t);
+        fpi = round(fp);
+        inflectPt = [];
+    else
+        p = polyfit(t, f, 3);
+        fp = polyval(p, t);
+        fpi = round(fp);
+        % find inflection points of best fit line
+        syms x;
+        px = p(1)*x^3 + p(2)*x^2 + p(3)*x + p(1);
+        p1= diff(px);
+        
+        inflectPt = round(double(solve(p1, 'MaxDegree', 3)));
+        inflectPt = inflectPt(imag(inflectPt) == 0 & inflectPt > t(1) & inflectPt < t(end));
+    end
     
     % create mask from line of best fit
     signalMask = zeros(size(spineMask));
@@ -35,25 +51,8 @@ function [ spineMask, len, angle ] = processSpine( spineMask, spect, minSNR  )
     spinePsd = sum(spinePsd(:));
     noisePsd = abs(spinePsd - signalPsd);
     snr = 10*log10(signalPsd / noisePsd);
-    gof = sum((f - fp) .^ 2) / numel(f);
-    
-    % find inflection points of best fit line
-    syms x;
-    px = p(1)*x^3 + p(2)*x^2 + p(3)*x + p(1);
-    p1= diff(px);
-    
-    if isnan(p1)
-        spineMask(spineInd) = 0;
-        len = 0;
-        angle = 0;
-        return   
-    end
-    
-    inflectPt = round(double(solve(p1, 'MaxDegree', 3)));
-    inflectPt = inflectPt(imag(inflectPt) == 0 & inflectPt > t(1) & inflectPt < t(end));
-    
-    
-    % 
+%     gof = sum((f - fp) .^ 2) / numel(f);
+ 
     len = zeros(1, numel(inflectPt) + 1);
     angles = zeros(1, numel(inflectPt) + 1);
     
