@@ -306,7 +306,7 @@ function destinationFile = getBurstSummaryDestination(startDate, stopDate, param
 end
 
 function showSummaryPanel( counts, edges, destinationFile )
-  summary = figure('position', [80 80 1600 900]);
+  summary = figure('visibility', 'off');
   % plot hourly totals
   h1 = subplot(3, 1, 1);
   bar(0:1:23, counts.hourlyTotals, 'histc');
