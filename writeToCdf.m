@@ -1,5 +1,5 @@
-function writeToCdf( cdfFolder, date, cdfDataMaster, cdfInfoMaster, data, numRecords, deltaT )
-  filename = sprintf('%s/rbsp-a_chorus-elements_%04d%02d%02d_v1.0.0', cdfFolder, date.Year, date.Month, date.Day);
+function writeToCdf( cdfFolder, version, date, cdfDataMaster, cdfInfoMaster, data, numRecords, deltaT )
+  filename = sprintf('%s/rbsp-a_chorus-elements_%04d%02d%02d_%s', cdfFolder, date.Year, date.Month, date.Day, version);
 
   % initialize static variables
   timeOffset = 0:deltaT:(98*deltaT);

@@ -27,6 +27,7 @@ t1 = tic;
     return
   end
     
+  version = 'v1.1';
 %--------------------------------------------------------------------------
 % Set up data for processing this batch of files. 
 % Load data from source files
@@ -51,7 +52,7 @@ t1 = tic;
   totalRecordsBatch = 0;
   
   % get destination file for summary panel
-  batchSummaryFigFile = getBurstSummaryDestination(startDate, stopDate, paramstring);
+  batchSummaryFigFile = getBurstSummaryDestination(startDate, stopDate, paramstring, version);
 %--------------------------------------------------------------------------
 % process each burst
 %--------------------------------------------------------------------------
@@ -68,7 +69,7 @@ t1 = tic;
     % create structure for storing data to be written to cdfs
     %----------------------------------------------------------------------
     % set data path for current day
-    dataPath = sprintf('data/mat/%04d/%02d/%02d', date.Year, date.Month, date.Day);
+    dataPath = sprintf('mat/%04d/%02d/%02d', date.Year, date.Month, date.Day);
     
     % create folders where results and figures will be saved
     [resultsFolder, figFolder] = createFolders(datapath, date, paramstring);
@@ -103,8 +104,8 @@ t1 = tic;
       if find(timestamp <= ppIntervals(:,2) & ...
         (timestamp + seconds(6)) > ppIntervals(:,1))
         % create filename for result and figure to be saved
-        figname = sprintf('%s/%s_%s.jpg', figFolder, strtok(filename, '.'), paramstring);
-        resultFilename = sprintf('%s/%s_result.mat', resultsFolder, strtok(filename, '.'));
+        figname = sprintf('%s/%s_%s_%s.jpg', figFolder, strtok(filename, '.'), paramstring, version);
+        resultFilename = sprintf('%s/%s_%s.mat', resultsFolder, strtok(filename, '.'), version);
         % create spectrogram
         [spect, fspec] = trimSpectrogram(timestamp, imagefile, fspec, fceTimes, fceLimits);
         
@@ -174,19 +175,19 @@ t1 = tic;
     end % end day
 
      % save summary data for day
-    resultsDayFilename = sprintf('%s/%04d%02d%02d_summary.mat', ...
-      resultsFolder, iDate.Year, iDate.Month, iDate.Day);
+    resultsDayFilename = sprintf('%s/%04d%02d%02d_summary_%s.mat', ...
+      resultsFolder, iDate.Year, iDate.Month, iDate.Day, version);
     save(resultsDayFilename, 'countsDay', 'totalRecordsDay');
 
     % save cdf file for day
     if totalRecordsDay > 0
-      writeToCdf( cdfFolder, date, cdfDataMaster, cdfInfoMaster, ...
+      writeToCdf( cdfFolder, version, date, cdfDataMaster, cdfInfoMaster, ...
         cdfData, numRecords, tspec(1) );
     end
 
     % create summary histograms for day
-    daySummaryFigFile = sprintf('%s/%04d%02d%02d_a_%s_summary.jpg', ...
-      figFolder, date.Year, date.Month, date.Day, paramstring);
+    daySummaryFigFile = sprintf('%s/%04d%02d%02d_a_%s_summary_%s.jpg', ...
+      figFolder, date.Year, date.Month, date.Day, paramstring, version);
     showSummaryPanel(countsDay, histEdges, daySummaryFigFile);
 
     % update batch totals
@@ -276,10 +277,10 @@ end
 
 function [resultsFolder, figFolder, cdfFolder] = createFolders(datapath, date, paramstring)
     
-  resultsFolder = sprintf('%s/results', datapath);
-  imagePath = sprintf('figures/%04d/%02d/%02d', date.Year, date.Month, date.Day);
+  resultsFolder = sprintf('v1.1/results/data/%s/results', datapath);
+  imagePath = sprintf('v1.1/figures/%04d/%02d/%02d', date.Year, date.Month, date.Day);
   figFolder = sprintf('%s/%04d%02d%02d_a_%s', imagePath, date.Year, date.Month, date.Day, paramstring);
-  cdfFolder = sprintf('data/cdf/%04d/%02d', date.Year, date.Month);
+  cdfFolder = sprintf('v1.1/data/cdf/%04d/%02d', date.Year, date.Month);
   
   % create directories if they do not exist
   if ~exist(resultsFolder, 'dir')
@@ -313,9 +314,9 @@ function [spect, fspec] = trimSpectrogram(timestamp, imagefile, fspec, fceTimes,
   spect = 10*log10(imagefile);
 end
 
-function destinationFile = getBurstSummaryDestination(startDate, stopDate, paramstring)
+function destinationFile = getBurstSummaryDestination(startDate, stopDate, paramstring, version)
   % create filename for summary image for batch, save in current months folder
-  destinationFolder = sprintf('figures/%04d/%02d', startDate.Year, startDate.Month);
+  destinationFolder = sprintf('%s/figures/%04d/%02d_%s', version, startDate.Year, startDate.Month, version);
   
   if exist(destinationFolder, 'dir') == 0
     mkdir(destinationFolder)
