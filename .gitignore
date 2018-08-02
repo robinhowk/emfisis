@@ -37,3 +37,12 @@ matlab_cdf364_patch-64/
 v1/
 v2/
 v2.1/
+
+# personal files
+documentation/
+other/
+source_files/
+
+# parameter files
+r*.mat
+

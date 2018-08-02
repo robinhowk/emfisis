@@ -1,16 +1,20 @@
-function [totalRecordsBatch, countsBatch] = runBatch( startDate, stopDate, ppFilename, fceFilename, cdfMasterFile )
+function [totalRecordsBatch, countsBatch] = runBatch
 t1 = tic;
 %RUNBATCH process all files in data/mat for given dates
 %   input format for startDate and stopDate:
 %   yyyyMMdd
 %   example: January 31, 2015 -> 20150131
 
-    % convert dates to datetime format
-    startDate = datetime(startDate, 'Format', 'yyyyMMdd');
-    stopDate = datetime(stopDate, 'Format', 'yyyyMMdd');
+    % get start date from user
+    userStartDate = input('Enter start date in the following format yyyyMMdd: ', 's');
+    userEndDate = input('Enter end date in the following format yyyyMMdd: ', 's');
+    
+    % convert dates input by user to datetime format
+    startDate = datetime(userStartDate, 'Format', 'yyyyMMdd');
+    stopDate = datetime(userEndDate, 'Format', 'yyyyMMdd');
     
     [paramfilename, paramstring, summaryFigBatch, ppIntervals, fceTimes, fceLimits, errorLogId, countsBatch, cdfDataMaster, cdfInfoMaster] ...
-        = setupBatch(startDate, stopDate, ppFilename, fceFilename, cdfMasterFile);
+        = setupBatch(startDate, stopDate);
     
     load(paramfilename);
     totalRecordsBatch = 0;
@@ -101,9 +105,9 @@ t1 = tic;
         save(resultsDayFilename, 'countsDay', 'totalRecordsDay');
 
         % save cdf file for day
-%         if totalRecordsDay > 0
-%             writeToCdf( cdfFilename, cdfDataMaster, cdfInfoMaster, cdfData, numRecords, tspec(1) );
-%         end
+        if totalRecordsDay > 0
+            writeToCdf( cdfFilename, cdfDataMaster, cdfInfoMaster, cdfData, numRecords, tspec(1) );
+        end
 
         % create summary histograms for day
         showSummaryPanel(countsDay, histEdges, summaryFigDay);
