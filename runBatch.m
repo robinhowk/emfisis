@@ -5,6 +5,9 @@ t1 = tic;
 %   yyyyMMdd
 %   example: January 31, 2015 -> 20150131
 
+%--------------------------------------------------------------------------
+% Get date range from user
+%--------------------------------------------------------------------------
     % get start date from user
     userStartDate = input('Enter start date in the following format yyyyMMdd: ', 's');
     userEndDate = input('Enter end date in the following format yyyyMMdd: ', 's');
@@ -13,12 +16,37 @@ t1 = tic;
     startDate = datetime(userStartDate, 'Format', 'yyyyMMdd');
     stopDate = datetime(userEndDate, 'Format', 'yyyyMMdd');
     
-    [paramfilename, paramstring, summaryFigBatch, ppIntervals, fceTimes, fceLimits, errorLogId, countsBatch, cdfDataMaster, cdfInfoMaster] ...
-        = setupBatch(startDate, stopDate);
+%--------------------------------------------------------------------------
+% Set up data for processing this batch of files. 
+% Load data from source files
+% set up error log
+% initalize struct for tallying results
+%--------------------------------------------------------------------------
+    % load param file and extract its title for naming files
+    % set up parameters
+    paramfilename = setparam;
+    paramstring = paramfilename(1:end-4);
     
-    load(paramfilename);
+    % load source files
+    [ppIntervals, fceTimes, fceLimits, cdfDataMaster, cdfInfoMaster] = ...
+      loadSourceFiles(startDate, stopDate);
+    
+    % create error log
+    errorLog = sprintf('logs/error_log_%s_to_%s_a.txt', datestr(startDate, 'yyyymmdd'), datestr(stopDate, 'yyyymmdd'));
+    errorLogId = fopen(errorLog, 'w');
+    
+    % initialize batch counts
+    countsBatch = initializeBatchCounts(histEdges);
     totalRecordsBatch = 0;
     
+%--------------------------------------------------------------------------
+  % move to end when creating image?
+    [summaryFigBatch] ...
+        = setupBatch(startDate, stopDate);
+
+%--------------------------------------------------------------------------
+% process each burst
+
     for iDate = startDate:stopDate
         % start timer
         t2 = tic;
@@ -137,6 +165,59 @@ t1 = tic;
     toc(t1)
 end
 
+function [ppIntervals, fceTimes, fceLimits, cdfDataMaster, cdfInfoMaster] = loadSourceFiles(startDate, stopDate)
+  % get location of files from user
+  ppFilename = getFilename('*.txt', 'plamapause intervals');
+  fceFilename = getFilename('*.dat', 'f_ce limits');
+  cdfFilename = getFilename('*.cdf', 'cdf master template');
+  
+  % load data from files
+  ppIntervals = getPlasmapauseIntervals(startDate, stopDate, ppFilename);
+  [fceTimes, fceLimits] = getFceLimits(startDate, stopDate, fceFilename);
+  [cdfDataMaster, cdfInfoMaster] = spdfcdfread(cdfFilename);
+end
 
+function filename = getFilename(fileType, fileContents)
+  % define MException in case when no file is selected
+  msgID = 'getPPFilename:NoFileSelcted';
+  msg = ['Selection of file containing ' fileContents ' is required.'];
+  selectException = MException(msgID, msg);
+  
+  % get file path from user
+  [file, path] = uigetfile(fileType, ['Select file containing ' fileContents]);
+  if isequal(file, 0)
+    % if user does not select file, throw an exception to terminate program
+    fclose('all');
+    throw(selectException);
+  else
+    filename = fullfile(path, file);
+    opts.Interpreter = 'tex';
+    opts.Default = 'Cancel';
+    displayName = strrep(filename, '\', '\\');
+    displayName = strrep(displayName, '_', '\_');
+    confirm = questdlg({'Confirm your selection.'; displayName}, ...
+        'Confirm selection', ...
+        'Ok', 'Cancel', opts);
+    if isequal(confirm, 'Cancel')
+      filename = getFilename;
+    end
+  end
+end
+
+function countsBatch = initializeBatchCounts(histEdges)
+    % chorusAnglesBatch - hist counts for chorus angles
+    % sweepratesBatch - hist counts for sweeprates
+    chorusAngles = zeros(1, length(histEdges.chorusAngles) - 1);
+    sweeprates = zeros(1, length(histEdges.sweeprates) - 1);
+    hourTotals = zeros(1, 24);
+    psdSums = [];
+    sweepratesList = [];
+    countsBatch = struct('chorusAngles', chorusAngles, ...
+                         'sweeprates', sweeprates, ...
+                         'hourlyTotals', hourTotals, ...
+                         'psdSums', psdSums, ...
+                         'sweepratesList', sweepratesList);
+    
+end
 
 
