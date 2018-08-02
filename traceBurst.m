@@ -1,4 +1,4 @@
-function [ chorusElements, tracedElements, chorusCount ] = traceBurst( detectedElements, spine, imagefile, fspec, tspec, mu, ridgesZero, errorLog, filename)
+function [ chorusElements, tracedElements, chorusCount ] = traceBurst( detectedElements, spine, imagefile, fspec, tspec, mu, ridges, errorLog, filename)
 %TRACECHORUS Summary of this function goes here
 %   Detailed explanation goes here
 
@@ -8,6 +8,7 @@ function [ chorusElements, tracedElements, chorusCount ] = traceBurst( detectedE
     tracedElements = zeros(size(detectedElements));
     chorusElements = struct();
     endpoints = zeros(20, 4);
+    ridgesZero = ridges - min(ridges(:));
 
     for iCol = 1:nCols
         colSum = sum(detectedElements(:, iCol));

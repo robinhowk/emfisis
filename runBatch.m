@@ -9,12 +9,23 @@ t1 = tic;
 % Get date range from user
 %--------------------------------------------------------------------------
   % get start date from user
-  userStartDate = input('Enter start date in the following format yyyyMMdd: ', 's');
-  userEndDate = input('Enter end date in the following format yyyyMMdd: ', 's');
+  userStartDate = input('\nEnter start date in the following format yyyyMMdd: ', 's');
+  userEndDate = input('\nEnter end date in the following format yyyyMMdd: ', 's');
 
   % convert dates input by user to datetime format
   startDate = datetime(userStartDate, 'Format', 'yyyyMMdd');
   stopDate = datetime(userEndDate, 'Format', 'yyyyMMdd');
+  
+  % get snr threshold from user
+  snrThreshold = input('\nEnter SNR threshold to be used: ');
+  
+  % confirm selections
+  userConfirm =  input('\n Confirm entered values (y/n): ');
+  if isequal(userConfirm, 'n')
+    totalRecordsBatch = 0;
+    countsBatch = 0;
+    return
+  end
     
 %--------------------------------------------------------------------------
 % Set up data for processing this batch of files. 
@@ -90,24 +101,28 @@ t1 = tic;
       % burst.
       %------------------------------------------------------------------
       if find(timestamp <= ppIntervals(:,2) & ...
-          (timestamp + seconds(6)) > ppIntervals(:,1))
+        (timestamp + seconds(6)) > ppIntervals(:,1))
         % create filename for result and figure to be saved
         figname = sprintf('%s/%s_%s.jpg', figFolder, strtok(filename, '.'), paramstring);
         resultFilename = sprintf('%s/%s_result.mat', resultsFolder, strtok(filename, '.'));
         % create spectrogram
         [spect, fspec] = trimSpectrogram(timestamp, imagefile, fspec, fceTimes, fceLimits);
-
-        % REMOVE RIDGE TRANSFORM AND ADD SNR MAPS
-        [ridges, bwRidges] = find_ridges(paramfilename, datafilename, spect);
+        
+        % create snr map of burst and select features about a given
+        % threshold
+        [ snrMap, features ] = mapSnr( spect, imagefile, snrThreshold );
 
         % if ridges are found, continue
-        if sum(sum(bwRidges)) >  0
-          ridgesZero = ridges - min(min(ridges));
-          [spine, bwSpine] = center_of_mass(ridgesZero, 2, 2);
-          [ chorusElements, tracedElements, chorusCount ] = traceBurst( bwSpine, spine, imagefile, fspec, tspec, mu1, ridgesZero, errorLogId, filename);
+        if ~isnan(sum(features(:)))
+          [spine, bwSpine] = center_of_mass(features, 2, 2);
+          [ chorusElements, tracedElements, chorusCount ] = ...
+            traceBurst( bwSpine, spine, imagefile, fspec, tspec, mu1, ...
+            features, errorLogId, filename);
 
           % create figure
-          showBurstFigure(tspec, fspec, delta_psd, imagefile1, ridges, spine, tracedElements, chorusElements, chorusCount, histEdges.sweeprates, figname);
+          showBurstFigure(tspec, fspec, spect, snrMap, features, ...
+            snrThreshold, spine, tracedElements, chorusElements, ...
+            chorusCount, histEdges.sweeprates, figname);
 
           % if chorus are found, continue
           if chorusCount > 0
@@ -141,20 +156,26 @@ t1 = tic;
             totalRecordsDay = totalRecordsDay + chorusCount;
 
             % save mat file
-            save(resultFilename, 'imagefile', 'imagefile1', 'fspec', 'tspec', 'ridges', 'bwRidges', 'chorusElements', 'paramfilename', 'timestamp', 'tracedElements', 'spine', 'bwSpine');
+            save(resultFilename, 'imagefile', 'imagefile1', 'fspec', ...
+              'tspec', 'features', 'bwRidges', 'chorusElements', ...
+              'paramfilename', 'timestamp', 'tracedElements', 'spine', ...
+              'bwSpine');
           else
             % save mat file
-            save(resultFilename, 'imagefile', 'imagefile1', 'fspec', 'tspec', 'ridges', 'bwRidges', 'paramfilename', 'timestamp');
+            save(resultFilename, 'imagefile', 'imagefile1', 'fspec', ...
+              'tspec', 'features', 'bwRidges', 'paramfilename', 'timestamp');
           end
         else
           % no ridges, save mat file
-          save(resultFilename, 'imagefile', 'imagefile1', 'fspec', 'tspec', 'paramfilename', 'timestamp');
+          save(resultFilename, 'imagefile', 'imagefile1', 'fspec', ...
+            'tspec', 'paramfilename', 'timestamp');
         end
       end % end of burst
     end % end day
 
      % save summary data for day
-    resultsDayFilename = sprintf('%s/%04d%02d%02d_summary.mat', resultsFolder, iDate.Year, iDate.Month, iDate.Day);
+    resultsDayFilename = sprintf('%s/%04d%02d%02d_summary.mat', ...
+      resultsFolder, iDate.Year, iDate.Month, iDate.Day);
     save(resultsDayFilename, 'countsDay', 'totalRecordsDay');
 
     % save cdf file for day

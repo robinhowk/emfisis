@@ -1,5 +1,6 @@
 function [spine, bw_spine] = center_of_mass(image, rx, ry)
     
+    image = image - min(image(:));
     spine = zeros(size(image));
     bw_spine = zeros(size(image));
     
@@ -28,31 +29,6 @@ function [spine, bw_spine] = center_of_mass(image, rx, ry)
         if image(ycenter, xcenter) ~= min(min(image))
             bw_spine(ycenter, xcenter) = 1;
         end
-        
-%         figure;
-%         i1 = subplot(2,1,1);
-%         imagesc(spines);
-%         colormap(i1, jet);
-%         set(i1, 'YDir', 'normal');
-%         i2 = subplot(2,1,2);
-%         imagesc(bw_spines);
-%         colormap(i2, gray);
-%         set(i2, 'YDir', 'normal');
-%         
-%         pause;
-%         close
+
     end    
-%     figure;
-%     i1 = subplot(3,1,1);
-%     imagesc(image);
-%     colormap(i1, jet);
-%     set(i1, 'YDir', 'normal');
-%     i2 = subplot(3,1,2);
-%     imagesc(spine);
-%     colormap(i2, jet);
-%     set(i2, 'YDir', 'normal');
-%     i3 = subplot(3,1,3);
-%     imagesc(bw_spine);
-%     colormap(i3, gray);
-%     set(i3, 'YDir', 'normal');
 end
