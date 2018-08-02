@@ -1,6 +1,4 @@
-function [ paramfilename, paramstring, summaryFigFilename, ppIntervals, ...
-  fceTimes, fceLimits, errorLogId, counts, cdfDataMaster, cdfInfoMaster] ...
-        = setupBatch( startDate, stopDate )
+function [ summaryFigFilename ] = setupBatch( startDate, stopDate )
 %SETUP gets parameter information, imports data and creates error log for
 %current batch of files to be run
 

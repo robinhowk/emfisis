@@ -8,13 +8,13 @@ t1 = tic;
 %--------------------------------------------------------------------------
 % Get date range from user
 %--------------------------------------------------------------------------
-    % get start date from user
-    userStartDate = input('Enter start date in the following format yyyyMMdd: ', 's');
-    userEndDate = input('Enter end date in the following format yyyyMMdd: ', 's');
-    
-    % convert dates input by user to datetime format
-    startDate = datetime(userStartDate, 'Format', 'yyyyMMdd');
-    stopDate = datetime(userEndDate, 'Format', 'yyyyMMdd');
+  % get start date from user
+  userStartDate = input('Enter start date in the following format yyyyMMdd: ', 's');
+  userEndDate = input('Enter end date in the following format yyyyMMdd: ', 's');
+
+  % convert dates input by user to datetime format
+  startDate = datetime(userStartDate, 'Format', 'yyyyMMdd');
+  stopDate = datetime(userEndDate, 'Format', 'yyyyMMdd');
     
 %--------------------------------------------------------------------------
 % Set up data for processing this batch of files. 
@@ -22,22 +22,22 @@ t1 = tic;
 % set up error log
 % initalize struct for tallying results
 %--------------------------------------------------------------------------
-    % load param file and extract its title for naming files
-    % set up parameters
-    paramfilename = setparam;
-    paramstring = paramfilename(1:end-4);
-    
-    % load source files
-    [ppIntervals, fceTimes, fceLimits, cdfDataMaster, cdfInfoMaster] = ...
-      loadSourceFiles(startDate, stopDate);
-    
-    % create error log
-    errorLog = sprintf('logs/error_log_%s_to_%s_a.txt', datestr(startDate, 'yyyymmdd'), datestr(stopDate, 'yyyymmdd'));
-    errorLogId = fopen(errorLog, 'w');
-    
-    % initialize batch counts
-    countsBatch = initializeBatchCounts(histEdges);
-    totalRecordsBatch = 0;
+  % load param file and extract its title for naming files
+  % set up parameters
+  paramfilename = setparam;
+  paramstring = paramfilename(1:end-4);
+
+  % load source files
+  [ppIntervals, fceTimes, fceLimits, cdfDataMaster, cdfInfoMaster] = ...
+    loadSourceFiles(startDate, stopDate);
+
+  % create error log
+  errorLog = sprintf('logs/error_log_%s_to_%s_a.txt', datestr(startDate, 'yyyymmdd'), datestr(stopDate, 'yyyymmdd'));
+  errorLogId = fopen(errorLog, 'w');
+
+  % initialize batch counts
+  countsBatch = initializeBatchCounts(histEdges, 0);
+  totalRecordsBatch = 0;
     
 %--------------------------------------------------------------------------
   % move to end when creating image?
@@ -47,14 +47,28 @@ t1 = tic;
 %--------------------------------------------------------------------------
 % process each burst
 
-    for iDate = startDate:stopDate
-        % start timer
-        t2 = tic;
-        
-        [dataPath, resultsFolder, figFolder, summaryFigDay, cdfFilename, filelist, countsDay] = setupDay( iDate, paramstring, histEdges);
-        cdfData = setupCdfRecords(cdfInfoMaster);
-        numRecords = 0;
-        totalRecordsDay = 0;
+  for iDate = startDate:stopDate
+    % start timer
+    t2 = tic;
+    
+    % set data path for current day
+    dataPath = sprintf('data/mat/%04d/%02d/%02d', date.Year, date.Month, date.Day);
+    
+    % create folders where results and figures will be saved
+    [resultsFolder, figFolder] = createFolders(datapath, date, paramstring);
+    
+    % get list of files
+    filelist = dir(fullfile(dataPath, '*.mat'));
+    
+    % initilize struct for tracking daily totalts
+    countsDay = initializeCounts(histEdges, defaultNum);
+    
+    [summaryFigDay, cdfFilename] = setupDay( iDate, paramstring, histEdges);
+    
+    
+    cdfData = setupCdfRecords(cdfInfoMaster);
+    numRecords = 0;
+    totalRecordsDay = 0;
         
         for iFile = 1:size(filelist,1)
             % get file path for burst
@@ -153,16 +167,16 @@ t1 = tic;
         totalRecordsDay
         % stop timer
         toc(t2)
-    end % end of batch
+  end % end of batch
     
-    % close all files
-    fclose('all');
+  % close all files
+  fclose('all');
 
-    % create summary histograms for batch
-    showSummaryPanel(countsBatch, histEdges, summaryFigBatch);
+  % create summary histograms for batch
+  showSummaryPanel(countsBatch, histEdges, summaryFigBatch);
     
-    totalRecordsBatch   
-    toc(t1)
+  totalRecordsBatch   
+  toc(t1)
 end
 
 function [ppIntervals, fceTimes, fceLimits, cdfDataMaster, cdfInfoMaster] = loadSourceFiles(startDate, stopDate)
@@ -204,20 +218,44 @@ function filename = getFilename(fileType, fileContents)
   end
 end
 
-function countsBatch = initializeBatchCounts(histEdges)
-    % chorusAnglesBatch - hist counts for chorus angles
-    % sweepratesBatch - hist counts for sweeprates
-    chorusAngles = zeros(1, length(histEdges.chorusAngles) - 1);
-    sweeprates = zeros(1, length(histEdges.sweeprates) - 1);
-    hourTotals = zeros(1, 24);
+function counts = initializeCounts(histEdges, defaultNum)
+  % chorusAnglesBatch - hist counts for chorus angles
+  % sweepratesBatch - hist counts for sweeprates
+  chorusAngles = zeros(1, length(histEdges.chorusAngles) - 1);
+  sweeprates = zeros(1, length(histEdges.sweeprates) - 1);
+  hourTotals = zeros(1, 24);
+  if defualtNum == 0
     psdSums = [];
     sweepratesList = [];
-    countsBatch = struct('chorusAngles', chorusAngles, ...
-                         'sweeprates', sweeprates, ...
-                         'hourlyTotals', hourTotals, ...
-                         'psdSums', psdSums, ...
-                         'sweepratesList', sweepratesList);
-    
+  else
+    psdSums = zeros(1, defaultNum);
+    sweepratesList = zeros(1, defaultNum);
+  end
+
+  counts = struct('chorusAngles', chorusAngles, ...
+                       'sweeprates', sweeprates, ...
+                       'hourlyTotals', hourTotals, ...
+                       'psdSums', psdSums, ...
+                       'sweepratesList', sweepratesList);
 end
 
-
+function [resultsFolder, figFolder, cdfFolder] = createFolders(datapath, date, paramstring)
+    
+  resultsFolder = sprintf('%s/results', datapath);
+  imagePath = sprintf('figures/%04d/%02d/%02d', date.Year, date.Month, date.Day);
+  figFolder = sprintf('%s/%04d%02d%02d_a_%s', imagePath, date.Year, date.Month, date.Day, paramstring);
+  cdfFolder = sprintf('data/cdf/%04d/%02d', date.Year, date.Month);
+  
+  % create directories if they do not exist
+  if ~exist(resultsFolder, 'dir')
+    mkdir(resultsFolder);
+  end
+  
+  if ~exist(figFolder, 'dir')
+    mkdir(figFolder); 
+  end
+  
+  if ~exist(cdfFolder, 'dir')
+    mkdir(cdfFolder)
+  end
+end
