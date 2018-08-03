@@ -34,7 +34,7 @@ histEdges = struct( 'chorusAngles', -90:5:90, 'sweeprates', -14:1:14);
 edges = -15:1:15;
 edges_weighted = -25:1:25;
 
-s1 = sprintf('r%5.2f_psd%d_rhophi%05.2f_thetaphi%05.2f_tau%0.2f.mat',r,abs(delta_psd),rho_phi,theta_phi, tau);
+s1 = sprintf('r%05.2f_psd%d_rhophi%05.2f_thetaphi%05.2f_tau%0.2f.mat',r,abs(delta_psd),rho_phi,theta_phi, tau);
 save(s1);
 end
 
