@@ -25,7 +25,7 @@ function [ chorusElements, tracedElements, chorusCount ] = traceBurst( detectedE
             deltaF = abs(freq(end) - freq(1));
             deltaFMax = max(freq) - min(freq);
             
-            if deltaF > 171 && (deltaF / deltaFMax) > 0.7 && deltaFMax > 240
+            if deltaF > 171 && (deltaF / deltaFMax) > 0.7 && deltaFMax > 240 && numel(timeIndexShifted) < 100
                 [sweeprate, chorusAngle, p1, p2, p3, p4, r2, knot1, knot2, knot3, segments, lenSegments] = piecewise_regression(time, freq, mu);
                 % shift knots to correct index
                 if segments == 2

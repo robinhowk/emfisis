@@ -1,4 +1,4 @@
-function writeToCdf( cdfFolder, version, date, cdfDataMaster, cdfInfoMaster, data, numRecords, deltaT )
+function writeToCdf( cdfFolder, version, date, cdfDataMaster, cdfInfoMaster, data, numRecords, deltaT, sourceFiles )
   filename = sprintf('%s/rbsp-a_chorus-elements_%04d%02d%02d_%s', cdfFolder, date.Year, date.Month, date.Day, version);
 
   % initialize static variables
@@ -30,6 +30,14 @@ function writeToCdf( cdfFolder, version, date, cdfDataMaster, cdfInfoMaster, dat
          rbvars(:,i) = [];
      end
   end
+  
+  ga = cdfInfoMaster.GlobalAttributes;
+  ga.FFT_size = {'1024'};
+  d1 = datestr(datetime('now'), 'ddd mmm dd HH:MM:SS');
+  d2 = datestr(datetime('now'), 'yyyy');
+  created = sprintf('%s CDT %s', d1, d2);
+  ga.Generation_date = {created};
+  ga.Source_file_list = sourceFiles;
 
   spdfcdfwrite(filename, varlist, ...
           'GlobalAttributes', cdfInfoMaster.GlobalAttributes, ...

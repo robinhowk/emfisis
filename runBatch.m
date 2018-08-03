@@ -20,7 +20,7 @@ t1 = tic;
   snrThreshold = input('\nEnter SNR threshold to be used: ');
   
   % confirm selections
-  userConfirm =  input('\n Confirm entered values (y/n): ');
+  userConfirm =  input('\n Confirm entered values (y/n): ', 's');
   if isequal(userConfirm, 'n')
     totalRecordsBatch = 0;
     countsBatch = 0;
@@ -90,7 +90,8 @@ t1 = tic;
     %----------------------------------------------------------------------
     for iFile = 1:size(filelist,1)
       % get file path for burst
-      filename = filelist(iFile).name;
+      filename = filelist(iFile).name
+      pause
       datafilename = sprintf('%s/%s', dataPath, filename);
       data = load(datafilename);
       fspec = data.fspec;
@@ -181,8 +182,9 @@ t1 = tic;
 
     % save cdf file for day
     if totalRecordsDay > 0
+      sourceFiles = getSourceFiles( ppFilename, fceFilename, timestamp);
       writeToCdf( cdfFolder, version, date, cdfDataMaster, cdfInfoMaster, ...
-        cdfData, numRecords, tspec(1) );
+        cdfData, numRecords, tspec(1), sourceFiles );
     end
 
     % create summary histograms for day
@@ -358,4 +360,23 @@ function showSummaryPanel( counts, edges, destinationFile )
   % save figure
   saveas(summary, destinationFile);
   close all
+end
+
+function sourceFiles = getSourceFiles( ppFilename, fceFilename, timestamp)
+    date = datestr(timestamp, 'yyyy MM DD');
+    year = date(1:4);
+    month = date(6:7);
+    day = date(9:10);
+    
+    filelist = dir(sprintf('/var/EMFISIS-SOC/OUT/RBSP-A/L2/%s/%s/%s', year, month, day));
+    sourceFiles{1,1} = ppFilename;
+    sourceFiles{2,1} = fceFilename;
+    
+    for i = 1:numel(filelist)
+        if contains(filelist(i).name, sprintf('%s%s%s', year, month, day)) ...
+                && contains(filelist(i).name, 'waveform-continuous-burst')
+            sourceFiles{3,1} = filelist(i).name;
+            return
+        end
+    end
 end
