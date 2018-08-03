@@ -40,7 +40,7 @@ t1 = tic;
   paramstring = paramfilename(1:end-4);
 
   % load source files
-  [ppIntervals, fceTimes, fceLimits, cdfDataMaster, cdfInfoMaster] = ...
+  [ppIntervals, fceTimes, fceLower, fceUpper, cdfDataMaster, cdfInfoMaster] = ...
     loadSourceFiles(startDate, stopDate);
 
   % create error log
@@ -107,14 +107,14 @@ t1 = tic;
         figname = sprintf('%s/%s_%s_%s.jpg', figFolder, strtok(filename, '.'), paramstring, version);
         resultFilename = sprintf('%s/%s_%s.mat', resultsFolder, strtok(filename, '.'), version);
         % create spectrogram
-        [spect, fspec] = trimSpectrogram(timestamp, imagefile, fspec, fceTimes, fceLimits);
+        [spect, fspec, isValid] = trimSpectrogram(timestamp, imagefile, fspec, fceTimes, fceLower, fceUpper);
         
         % create snr map of burst and select features about a given
         % threshold
         [ snrMap, features ] = mapSnr( spect, imagefile, snrThreshold );
 
         % if ridges are found, continue
-        if ~isnan(sum(features(:)))
+        if ~isnan(sum(features(:))) && isValid
           [spine, bwSpine] = center_of_mass(features, 2, 2);
           [ chorusElements, tracedElements, chorusCount ] = ...
             traceBurst( bwSpine, spine, imagefile, fspec, tspec, mu1, ...
@@ -215,7 +215,7 @@ t1 = tic;
   toc(t1)
 end
 
-function [ppIntervals, fceTimes, fceLimits, cdfDataMaster, cdfInfoMaster] = loadSourceFiles(startDate, stopDate)
+function [ppIntervals, fceTimes, fceLower, fceUpper, cdfDataMaster, cdfInfoMaster] = loadSourceFiles(startDate, stopDate)
   % get location of files from user
   ppFilename = getFilename('*.txt', 'plamapause intervals');
   fceFilename = getFilename('*.dat', 'f_ce limits');
@@ -223,7 +223,7 @@ function [ppIntervals, fceTimes, fceLimits, cdfDataMaster, cdfInfoMaster] = load
   
   % load data from files
   ppIntervals = getPlasmapauseIntervals(startDate, stopDate, ppFilename);
-  [fceTimes, fceLimits] = getFceLimits(startDate, stopDate, fceFilename);
+  [fceTimes, fceLower, fceUpper] = getFceLimits(startDate, stopDate, fceFilename);
   [cdfDataMaster, cdfInfoMaster] = spdfcdfread(cdfFilename);
 end
 
@@ -296,22 +296,36 @@ function [resultsFolder, figFolder, cdfFolder] = createFolders(datapath, date, p
   end
 end
 
-function [spect, fspec] = trimSpectrogram(timestamp, imagefile, fspec, fceTimes, fceLimits)
-  % create timestamp with one second precision to find freq limit
-  tempTime = datevec(timestamp);
-  tempTime(6) = floor(tempTime(6));
-  tempTime = datetime(tempTime);
-  % find maximum frequency
-  freqLimit = fceLimits(find((fceTimes > tempTime), 1));
-  freqLimit = find((fspec > freqLimit), 1);
-
-  % trim psd to freq limit and scale to 10log10
-  if ~isempty(freqLimit)
-     imagefile = imagefile(1:freqLimit, :);
-     fspec = fspec(1:freqLimit);
+function [spect, fspec, isValid] = trimSpectrogram(timestamp, imagefile, fspec, fceTimes, fceLower, fceUpper)
+  % check a fceTime falls inside the burst
+  fceInd = find(timestamp >= fceTimes & timestamp + seconds(6) <= fceTimes);
+  if numel(fceInd) == 1
+    fLow = fceLower(fceInd);
+    fHigh = fceUpper(fceInd);
+  else
+    tmid = timestamp + seconds(tspec(end))/2;
+    next = find(fceTimes > tmid, 1, 'first');
+    prev = next - 1;
+    fLow = interpFce(fceTimes(prev), fceTimes(next), tmid, fceLower(prev), fceLower(next));
+    fHigh = interpFce(fceTimes(prev), fceTimes(next), tmid, fceUpper(prev), fceUpper(next));
   end
-  
+
+  % if there was no valid fce limits set fspec to an empty vector
   spect = 10*log10(imagefile);
+  if ~isnan(fLow)
+    low = find(fspec > fLow, 1, 'first');
+    low = low - 1;
+    high = find(fspec > fHigh, 1, 'first');
+    low = min(max(1, low), numel(fspec));
+    high = max(min(numel(fspec), high), 1);
+    if low ~= high
+        fspec = fspec(low:high);
+        spect = spect(low:high, :);
+    end
+    isValid = true;
+  else
+    isValid = false;
+  end
 end
 
 function destinationFile = getBurstSummaryDestination(startDate, stopDate, paramstring, version)
