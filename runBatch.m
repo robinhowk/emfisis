@@ -1,4 +1,5 @@
 function [totalRecordsBatch, countsBatch] = runBatch
+addpath('matlab_cdf364_patch-64');
 t1 = tic;
 %RUNBATCH process all files in data/mat for given dates
 %   input format for startDate and stopDate:
@@ -38,7 +39,8 @@ t1 = tic;
   % set up parameters
   paramfilename = setparam;
   paramstring = paramfilename(1:end-4);
-
+  load(paramfilename);
+  
   % load source files
   [ppIntervals, fceTimes, fceLower, fceUpper, cdfDataMaster, cdfInfoMaster] = ...
     loadSourceFiles(startDate, stopDate);
@@ -48,7 +50,7 @@ t1 = tic;
   errorLogId = fopen(errorLog, 'w');
 
   % initialize batch counts
-  countsBatch = initializeBatchCounts(histEdges, 0);
+  countsBatch = initializeCounts(histEdges, 0);
   totalRecordsBatch = 0;
   
   % get destination file for summary panel
@@ -69,16 +71,16 @@ t1 = tic;
     % create structure for storing data to be written to cdfs
     %----------------------------------------------------------------------
     % set data path for current day
-    dataPath = sprintf('mat/%04d/%02d/%02d', date.Year, date.Month, date.Day);
+    dataPath = sprintf('mat/%04d/%02d/%02d', iDate.Year, iDate.Month, iDate.Day);
     
     % create folders where results and figures will be saved
-    [resultsFolder, figFolder] = createFolders(datapath, date, paramstring);
+    [resultsFolder, figFolder] = createFolders(dataPath, iDate, paramstring)
     
     % get list of files
     filelist = dir(fullfile(dataPath, '*.mat'));
     
     % initilize struct for tracking daily totalts
-    countsDay = initializeCounts(histEdges, defaultNum);
+    countsDay = initializeCounts(histEdges, 500);
     numRecords = 0;
     totalRecordsDay = 0;
     
@@ -97,6 +99,8 @@ t1 = tic;
       fspec = data.fspec;
       tspec = data.tspec;
       imagefile = data.imagefile;
+      timestamp = data.timestamp;
+      
       %------------------------------------------------------------------
       % check if current burst falls within a valid plasmapause interval. 
       % If so, trim spectrogram, scale to 10log10 and continue processing 
@@ -108,7 +112,7 @@ t1 = tic;
         figname = sprintf('%s/%s_%s_%s.jpg', figFolder, strtok(filename, '.'), paramstring, version);
         resultFilename = sprintf('%s/%s_%s.mat', resultsFolder, strtok(filename, '.'), version);
         % create spectrogram
-        [spect, fspec, isValid] = trimSpectrogram(timestamp, imagefile, fspec, fceTimes, fceLower, fceUpper);
+        [spect, fspec, isValid] = trimSpectrogram(timestamp, imagefile, tspec, fspec, fceTimes, fceLower, fceUpper);
         
         % create snr map of burst and select features about a given
         % threshold
@@ -262,7 +266,7 @@ function counts = initializeCounts(histEdges, defaultNum)
   chorusAngles = zeros(1, length(histEdges.chorusAngles) - 1);
   sweeprates = zeros(1, length(histEdges.sweeprates) - 1);
   hourTotals = zeros(1, 24);
-  if defualtNum == 0
+  if defaultNum == 0
     psdSums = [];
     sweepratesList = [];
   else
@@ -298,7 +302,7 @@ function [resultsFolder, figFolder, cdfFolder] = createFolders(datapath, date, p
   end
 end
 
-function [spect, fspec, isValid] = trimSpectrogram(timestamp, imagefile, fspec, fceTimes, fceLower, fceUpper)
+function [spect, fspec, isValid] = trimSpectrogram(timestamp, imagefile, tspec, fspec, fceTimes, fceLower, fceUpper)
   % check a fceTime falls inside the burst
   fceInd = find(timestamp >= fceTimes & timestamp + seconds(6) <= fceTimes);
   if numel(fceInd) == 1
