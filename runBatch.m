@@ -38,7 +38,7 @@ t1 = tic;
   % load param file and extract its title for naming files
   % set up parameters
   paramfilename = setparam;
-  paramstring = paramfilename(1:end-4);
+  paramstring = paramfilename(1:end-4)
   load(paramfilename);
   
   % load source files
@@ -283,7 +283,7 @@ end
 
 function [resultsFolder, figFolder, cdfFolder] = createFolders(datapath, date, paramstring)
     
-  resultsFolder = sprintf('v1.1/results/data/%s/results', datapath);
+  resultsFolder = sprintf('v1.1/results/data/%s', datapath);
   imagePath = sprintf('v1.1/figures/%04d/%02d/%02d', date.Year, date.Month, date.Day);
   figFolder = sprintf('%s/%04d%02d%02d_a_%s', imagePath, date.Year, date.Month, date.Day, paramstring);
   cdfFolder = sprintf('v1.1/data/cdf/%04d/%02d', date.Year, date.Month);
