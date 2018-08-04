@@ -2,7 +2,7 @@ function showBurstFigure( tspec, fspec, imagefile1, snrMap, ...
   ridges, snrThreshold, spine, tracedElements, chorusElements, ...
   chorusCount, edges, figname )
 
-  summary = figure('visiblity', 'off');
+  summary = figure('visible', 'off');
   h1 = subplot(4,2,1);
   imagesc(tspec, fspec, imagefile1);
   colormap(h1, jet);
