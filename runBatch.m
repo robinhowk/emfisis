@@ -115,7 +115,7 @@ t1 = tic;
         
         % create snr map of burst and select features about a given
         % threshold
-        [ snrMap, features ] = mapSnr( spect, imagefile, snrThreshold );
+        [ snrMap, features ] = mapSnr( spect, 10*log10(imagefile), snrThreshold );
 
         % if ridges are found, continue
         if ~isnan(sum(features(:))) && isValid
