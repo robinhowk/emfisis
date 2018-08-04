@@ -28,7 +28,7 @@ t1 = tic;
     return
   end
     
-  version = 'v1.1';
+  version = 'v1.1.1';
 %--------------------------------------------------------------------------
 % Set up data for processing this batch of files. 
 % Load data from source files
@@ -38,12 +38,12 @@ t1 = tic;
   % load param file and extract its title for naming files
   % set up parameters
   paramfilename = setparam;
-  paramstring = paramfilename(1:end-4)
+  paramstring = paramfilename(1:end-4);
   load(paramfilename);
   
   % load source files
-  [ppIntervals, fceTimes, fceLower, fceUpper, cdfDataMaster, cdfInfoMaster] = ...
-    loadSourceFiles(startDate, stopDate);
+  [ppIntervals, ppFilename, fceTimes, fceLower, fceUpper, fceFilename, ...
+    cdfDataMaster, cdfInfoMaster] = loadSourceFiles(startDate, stopDate);
 
   % create error log
   errorLog = sprintf('logs/error_log_%s_to_%s_a.txt', datestr(startDate, 'yyyymmdd'), datestr(stopDate, 'yyyymmdd'));
@@ -54,7 +54,7 @@ t1 = tic;
   totalRecordsBatch = 0;
   
   % get destination file for summary panel
-  batchSummaryFigFile = getBurstSummaryDestination(startDate, stopDate, paramstring, version);
+  batchSummaryFigFile = getBurstSummaryDestination(startDate, stopDate, version);
 %--------------------------------------------------------------------------
 % process each burst
 %--------------------------------------------------------------------------
@@ -74,7 +74,7 @@ t1 = tic;
     dataPath = sprintf('mat/%04d/%02d/%02d', iDate.Year, iDate.Month, iDate.Day);
     
     % create folders where results and figures will be saved
-    [resultsFolder, figFolder] = createFolders(dataPath, iDate, paramstring)
+    [resultsFolder, figFolder, cdfFolder] = createFolders(dataPath, iDate, version);
     
     % get list of files
     filelist = dir(fullfile(dataPath, '*.mat'));
@@ -93,13 +93,12 @@ t1 = tic;
     for iFile = 1:size(filelist,1)
       % get file path for burst
       filename = filelist(iFile).name
-      pause
       datafilename = sprintf('%s/%s', dataPath, filename);
       data = load(datafilename);
       fspec = data.fspec;
       tspec = data.tspec;
       imagefile = data.imagefile;
-      timestamp = data.timestamp;
+      timestamp = data.timestamp
       
       %------------------------------------------------------------------
       % check if current burst falls within a valid plasmapause interval. 
@@ -109,7 +108,7 @@ t1 = tic;
       if find(timestamp <= ppIntervals(:,2) & ...
         (timestamp + seconds(6)) > ppIntervals(:,1))
         % create filename for result and figure to be saved
-        figname = sprintf('%s/%s_%s_%s.jpg', figFolder, strtok(filename, '.'), paramstring, version);
+        figname = sprintf('%s/%s_%s.jpg', figFolder, strtok(filename, '.'), version);
         resultFilename = sprintf('%s/%s_%s.mat', resultsFolder, strtok(filename, '.'), version);
         % create spectrogram
         [spect, fspec, isValid] = trimSpectrogram(timestamp, imagefile, tspec, fspec, fceTimes, fceLower, fceUpper);
@@ -162,18 +161,18 @@ t1 = tic;
             totalRecordsDay = totalRecordsDay + chorusCount;
 
             % save mat file
-            save(resultFilename, 'imagefile', 'imagefile1', 'fspec', ...
-              'tspec', 'features', 'bwRidges', 'chorusElements', ...
+            save(resultFilename, 'imagefile', 'spect', 'fspec', ...
+              'tspec', 'features', 'chorusElements', ...
               'paramfilename', 'timestamp', 'tracedElements', 'spine', ...
               'bwSpine');
           else
             % save mat file
-            save(resultFilename, 'imagefile', 'imagefile1', 'fspec', ...
-              'tspec', 'features', 'bwRidges', 'paramfilename', 'timestamp');
+            save(resultFilename, 'imagefile', 'spect', 'fspec', ...
+              'tspec', 'features', 'paramfilename', 'timestamp');
           end
         else
           % no ridges, save mat file
-          save(resultFilename, 'imagefile', 'imagefile1', 'fspec', ...
+          save(resultFilename, 'imagefile', 'spect', 'fspec', ...
             'tspec', 'paramfilename', 'timestamp');
         end
       end % end of burst
@@ -221,7 +220,8 @@ t1 = tic;
   toc(t1)
 end
 
-function [ppIntervals, fceTimes, fceLower, fceUpper, cdfDataMaster, cdfInfoMaster] = loadSourceFiles(startDate, stopDate)
+function [ppIntervals, ppFilename, fceTimes, fceLower, fceUpper, fceFilename,...
+  cdfDataMaster, cdfInfoMaster] = loadSourceFiles(startDate, stopDate)
   % get location of files from user
   ppFilename = getFilename('*.txt', 'plamapause intervals');
   fceFilename = getFilename('*.dat', 'f_ce limits');
@@ -281,12 +281,11 @@ function counts = initializeCounts(histEdges, defaultNum)
                        'sweepratesList', sweepratesList);
 end
 
-function [resultsFolder, figFolder, cdfFolder] = createFolders(datapath, date, paramstring)
+function [resultsFolder, figFolder, cdfFolder] = createFolders(datapath, date, version)
     
-  resultsFolder = sprintf('v1.1/results/data/%s', datapath);
-  imagePath = sprintf('v1.1/figures/%04d/%02d/%02d', date.Year, date.Month, date.Day);
-  figFolder = sprintf('%s/%04d%02d%02d_a_%s', imagePath, date.Year, date.Month, date.Day, paramstring);
-  cdfFolder = sprintf('v1.1/data/cdf/%04d/%02d', date.Year, date.Month);
+  resultsFolder = sprintf('%s/rbsp-a/data/%s', version, datapath);
+  figFolder = sprintf('%s/rbsp-a/figures/%04d/%02d/%02d', version, date.Year, date.Month, date.Day);
+  cdfFolder = sprintf('%s/rbsp-a/data/cdf/%04d/%02d', version, date.Year, date.Month);
   
   % create directories if they do not exist
   if ~exist(resultsFolder, 'dir')
@@ -334,17 +333,17 @@ function [spect, fspec, isValid] = trimSpectrogram(timestamp, imagefile, tspec, 
   end
 end
 
-function destinationFile = getBurstSummaryDestination(startDate, stopDate, paramstring, version)
+function destinationFile = getBurstSummaryDestination(startDate, stopDate, version)
   % create filename for summary image for batch, save in current months folder
-  destinationFolder = sprintf('%s/figures/%04d/%02d_%s', version, startDate.Year, startDate.Month, version);
+  destinationFolder = sprintf('%s/rbsp-a/figures/%04d/%02d', version, startDate.Year, startDate.Month);
   
   if exist(destinationFolder, 'dir') == 0
     mkdir(destinationFolder)
   end
     
-  destinationFile = sprintf('%s/%04d%02d%02d_to_%04d%02d%02d_a_%s_summary.jpg', ...
+  destinationFile = sprintf('%s/%04d%02d%02d_to_%04d%02d%02d_rbsp-a_summary.jpg', ...
     destinationFolder, startDate.Year, startDate.Month, startDate.Day, ...
-    stopDate.Year, stopDate.Month, stopDate.Day, paramstring);
+    stopDate.Year, stopDate.Month, stopDate.Day);
 end
 
 function showSummaryPanel( counts, edges, destinationFile )

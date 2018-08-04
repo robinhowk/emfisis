@@ -16,7 +16,6 @@ function [ chorusElements, tracedElements, chorusCount ] = traceBurst( detectedE
         % been found
         while colSum > 0
             [ detectedElements, chorusPixel, freqVec, psdVec ] = traceChorus( iCol, detectedElements, imagefile, spine, fspec, tspec, mu );
-            
             [freqIndex, timeIndex] = find(chorusPixel > 0);
             timeIndexShifted = timeIndex + iCol - 1;
             time = tspec(timeIndexShifted);
@@ -48,8 +47,10 @@ function [ chorusElements, tracedElements, chorusCount ] = traceBurst( detectedE
                 psdSumLog = 0;
                 psdSumPixel = 0;
                 for i = 1:length(time)
-                   psdSum = psdSum + sum(imagefile(freqIndex(i)-2:freqIndex(i)+2, timeIndexShifted(i)));
-                   psdSumLog = psdSumLog + sum(ridgesZero(freqIndex(i)-2:freqIndex(i)+2, timeIndexShifted(i)));
+                   psdBottom = max(freqIndex(i)-2, 1);
+                   psdTop = min(freqIndex(i)+2, nRows);
+                   psdSum = psdSum + sum(imagefile(psdBottom:psdTop, timeIndexShifted(i)));
+                   psdSumLog = psdSumLog + sum(ridgesZero(psdBottom:psdTop, timeIndexShifted(i)));
                    psdSumPixel = psdSumPixel + ridgesZero(freqIndex(i), timeIndexShifted(i));
                 end
                 avgPsdLog = psdSumLog / length(time);
@@ -88,7 +89,6 @@ function [ chorusElements, tracedElements, chorusCount ] = traceBurst( detectedE
                         
                         if segments == 1
                             f1 = polyval(p1, tspec(timeIndexShifted));
-                            length(f1)
                             length(timeIndexShifted)
                             for i = 1:length(f1)
                                ind = find(fspec > f1(i),1);

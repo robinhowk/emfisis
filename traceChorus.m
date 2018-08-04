@@ -22,7 +22,11 @@ function [ detectedElements, chorusPixel, freqVec, psdVec ] = ...
         % of surrounding pixels
         fWeighted = zeros(numel(fIndex), 1);
         for i = 1:numel(fIndex)
-            fWeighted(i) = sum(sum(spine(fIndex(i)-2:fIndex(i)+2, colIndex-1:colIndex+1)));
+            fwBottom = max(fIndex(i)-2, 1);
+            fwTop = min(fIndex(i)+2, nRows);
+            colLeft = max(colIndex-1, 1);
+            colRight = min(colIndex+1, nCols);
+            fWeighted(i) = sum(sum(spine(fwBottom:fwTop, colLeft:colRight)));
         end
         % chose index with highest sum
         [~, maxInd] = max(fWeighted);
@@ -47,7 +51,7 @@ function [ detectedElements, chorusPixel, freqVec, psdVec ] = ...
     psdVec(traceIndex) = imagefile(fIndex, colIndex);
     
     % get column sum of subimage
-    [subimageDim] = subimageColSum(traceSpread, detectedElements, fIndex, colIndex);
+    [subimageDim] = subimageColSum(traceSpread, fIndex, colIndex, nRows, nCols);
     
     % increment column index
     colIndex = colIndex + 1;
@@ -55,7 +59,7 @@ function [ detectedElements, chorusPixel, freqVec, psdVec ] = ...
     % calculate sum of next column in subimage
     colSum = sum(detectedElements(subimageDim.bottom:subimageDim.top, colIndex));
     
-    while (colSum > 0 || prevSum > 0) && colIndex <= nCols
+    while (colSum > 0 || prevSum > 0) && colIndex <= nCols - 1
         %  update current time
         tCur = tspec(colIndex);
         % find current frequency
@@ -124,8 +128,12 @@ function [ detectedElements, chorusPixel, freqVec, psdVec ] = ...
 
             % check surrounding pixels in detected elements to make sure no
             % artifacts remain
-            if sum(sum(detectedElements(fIndex-2:fIndex+2, colIndex-1:colIndex+1))) > 0
-                detectedElements(fIndex-2:fIndex+2, colIndex-1) = 0;
+            tempBottom = max(fIndex-2, 1);
+            tempTop = min(fIndex+2, nRows);
+            tempLeft = max(colIndex-1, 1);
+            tempRight = min(colIndex+1, nCols);
+            if sum(sum(detectedElements(tempBottom:tempTop, tempLeft:tempRight))) > 0
+                detectedElements(max(fIndex-2, 1):min(fIndex+2, nRows), colIndex-1) = 0;
             end
         end
         fCur = fspec(fIndex);
@@ -152,7 +160,7 @@ function [ detectedElements, chorusPixel, freqVec, psdVec ] = ...
             prevSum = colSum;
             
             % update subimage data
-            subimageDim = subimageColSum(traceSpread, detectedElements, fIndex, colIndex);
+            subimageDim = subimageColSum(traceSpread, fIndex, colIndex, nRows, nCols);
 
             % increment counters
             colIndex = colIndex + 1;
@@ -178,10 +186,10 @@ function [ detectedElements, chorusPixel, freqVec, psdVec ] = ...
     psdVec = psdVec(1:traceIndex);
 end
 
-function subimageDim = subimageColSum(radius, detectedElements, fIndex, tIndex)
-    winTop = min((fIndex + radius), size(detectedElements, 1));
+function subimageDim = subimageColSum(radius, fIndex, tIndex, nRows, nCols)
+    winTop = min((fIndex + radius), nRows);
     winBottom = max((fIndex - radius), 1);
     winLeft = max((tIndex - radius), 1);
-    winRight = min((tIndex + radius), size(detectedElements, 2));
+    winRight = min((tIndex + radius), nCols);
     subimageDim = struct('top', winTop, 'bottom', winBottom', 'left', winLeft', 'right', winRight);
 end
