@@ -186,7 +186,7 @@ t1 = tic;
     % save cdf file for day
     if totalRecordsDay > 0
       sourceFiles = getSourceFiles( ppFilename, fceFilename, timestamp);
-      writeToCdf( cdfFolder, version, date, cdfDataMaster, cdfInfoMaster, ...
+      writeToCdf( cdfFolder, version, iDate, cdfDataMaster, cdfInfoMaster, ...
         cdfData, numRecords, tspec(1), sourceFiles );
     end
 

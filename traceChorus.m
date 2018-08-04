@@ -54,12 +54,16 @@ function [ detectedElements, chorusPixel, freqVec, psdVec ] = ...
     [subimageDim] = subimageColSum(traceSpread, fIndex, colIndex, nRows, nCols);
     
     % increment column index
-    colIndex = colIndex + 1;
+    colIndex = min(colIndex + 1, nCols);
     
     % calculate sum of next column in subimage
+    size(detectedElements)
+    subimageDim
+    colIndex
     colSum = sum(detectedElements(subimageDim.bottom:subimageDim.top, colIndex));
     
     while (colSum > 0 || prevSum > 0) && colIndex <= nCols - 1
+      colIndex
         %  update current time
         tCur = tspec(colIndex);
         % find current frequency
