@@ -1,9 +1,9 @@
-function [ skeleton, segmentLabels, newSpines ] = findSpines( ridges, tspec, fspec )
+function [ skeleton, segmentLabels, spineLabels, spine ] = findSpines( ridges )
 %UNTITLED Summary of this function goes here
 %   Detailed explanation goes here
     
   % find the skeleton of ridge features
-  skeleton = skeletonize(ridges, tspec, fspec);
+  skeleton = skeletonize(ridges);
 
   % identify each segment of the skeleton
   [segmentLabels, numSegments, bpoints, epoints] = identifySegments(skeleton);
@@ -11,8 +11,9 @@ function [ skeleton, segmentLabels, newSpines ] = findSpines( ridges, tspec, fsp
   % classify each branch point
   bpointInfo = classifyBpoints( segmentLabels, bpoints, epoints );
 
-  newSpines = identifySpines( skeleton, segmentLabels, numSegments, bpoints, bpointInfo );
-   
+  spineLabels = identifySpines( skeleton, segmentLabels, numSegments, bpoints, bpointInfo );
+  spine = zeros(size(spineLabels));
+  spine(spineLabels > 0) = 1;
 end
 
 
@@ -23,13 +24,13 @@ end
 % Extracts the domint ridges along the gradient, creating skeleton of ridge
 % features
 %--------------------------------------------------------------------------
-function skeleton = skeletonize( ridges, tspec, fspec )
+function skeleton = skeletonize( ridges )
   % create binary version of ridge features
   bwRidges = ridges;
   bwRidges(bwRidges > min(ridges(:))) = 1;
   bwRidges(bwRidges < 1) = 0;
   bwRidges = bwmorph(bwRidges, 'fill');
-
+  
   % calculate distance transform
   dist = bwdist(~bwRidges);
   dist(dist == 0) = NaN;
@@ -44,13 +45,14 @@ function skeleton = skeletonize( ridges, tspec, fspec )
   grad(grad < 1) = 1;
   grad = grad -1;
   grad(isnan(grad)) = 0;
+  
   % thin and clean skeleton
   skeleton = bwmorph(grad, 'thin', Inf);
   skeleton = bwmorph(skeleton, 'clean');
 
   % pad skeleton so edges can be reached for further cleaning
   skeleton = padarray(skeleton, [2 2], 0, 'both');
-
+  
   % remove branches of size 1
   skeleton = removeSpurs(skeleton);
 
@@ -308,7 +310,7 @@ function bpointInfo = classifyBpoints( segmentLabels, bpoints, epoints )
     labels = segmentLabels(fb(i) - 1:fb(i) + 1, tb(i) - 1:tb(i) + 1);
     labels = unique(labels(labels > 0))';
     hasEpoint = ismember(labels, epointLabels);
-    bpointInfo(:, :, i) = [labels; hasEpoint]';
+    bpointInfo(1:numel(labels), :, i) = [labels; hasEpoint]';
   end
 end
 
@@ -381,7 +383,9 @@ function newSpines = identifySpines( skeleton, segmentLabels, numSegments, bpoin
 
   for i = 1:numel(curBpoints)
     adjCurBpoint = squeeze(bpointInfo(:, 1, curBpoints(i)));
+    adjCurBpoint = adjCurBpoint(adjCurBpoint > 0);
     adjSegments = squeeze(bpointInfo(:, 1, closeBpoints(:,i)));
+    adjSegments = adjSegments(adjSegments > 0);
     connectedSegments = adjCurBpoint(ismember(adjCurBpoint, adjSegments));
 
     if numel(connectedSegments) == 2 && ~visitedBpoints(curBpoints(i))
@@ -421,33 +425,36 @@ function newSpines = identifySpines( skeleton, segmentLabels, numSegments, bpoin
           
           % find unvisited segments
           adjSegments = squeeze(bpointInfo(:, 1, newBpoint));
-          newSegments = adjSegments(~visitedSegments(adjSegments));     
-          % try each combination of segments with the exisiting spine
-          gof = zeros(numel(newSegments), 1);
-          for j = 1:numel(newSegments)
-            curSegment = segmentLabels == newSegments(j);
-            testSpine = curSegment + spine;
-            gof(j) = calcAdjRsquared(testSpine);
+          adjSegments = adjSegments(adjSegments > 0);
+          newSegments = adjSegments(~visitedSegments(adjSegments));
+          if ~isempty(newSegments)
+            % try each combination of segments with the exisiting spine
+            gof = zeros(numel(newSegments), 1);
+            for j = 1:numel(newSegments)
+              curSegment = segmentLabels == newSegments(j);
+              testSpine = curSegment + spine;
+              gof(j) = calcAdjRsquared(testSpine);
+            end
+
+            [~, maxGof] = max(gof);
+            newSegment = newSegments(maxGof);
+            % add selected segment to the spine
+            spine(segmentLabels == newSegment) = 1;
+            % update segment label
+            newLabels(newSegment) = numNewSpines;
+            unusedSegments = newSegments(~ismember(newSegments, newSegment));
+            newLabels(unusedSegments) = -1;
+            % if selected segment does not contain an endpoint, find the
+            % branch point on the other end
+            isSpur = bpointInfo(adjSegments == newSegment, 2, newBpoint);
+            if ~isSpur
+              connectedNewSegment =  squeeze(sum(ismember(bpointInfo(:, 1, :), newSegment)));
+              nextBpoint = find(connectedNewSegment & ~visitedBpoints == 1);
+              connectedBpoints = [connectedBpoints; nextBpoint];
+            end
+
+            visitedSegments(adjSegments) = true;
           end
-          
-          [~, maxGof] = max(gof);
-          newSegment = newSegments(maxGof);
-          % add selected segment to the spine
-          spine(segmentLabels == newSegment) = 1;
-          % update segment label
-          newLabels(newSegment) = numNewSpines;
-          unusedSegments = newSegments(~ismember(newSegments, newSegment));
-          newLabels(unusedSegments) = -1;
-          % if selected segment does not contain an endpoint, find the
-          % branch point on the other end
-          isSpur = bpointInfo(adjSegments == newSegment, 2, newBpoint);
-          if ~isSpur
-            connectedNewSegment =  squeeze(sum(ismember(bpointInfo(:, 1, :), newSegment)));
-            nextBpoint = find(connectedNewSegment & ~visitedBpoints == 1);
-            connectedBpoints = [connectedBpoints; nextBpoint];
-          end
-          
-          visitedSegments(adjSegments) = true;
         end
       end
       % increment number of new spines and save to new spines
@@ -470,6 +477,7 @@ function newSpines = identifySpines( skeleton, segmentLabels, numSegments, bpoin
     % get info about current branch point
     curBpointInfo = bpointInfo(:, :, i);
     adjSegments = curBpointInfo(:, 1);
+    adjSegments = adjSegments(adjSegments > 0);
     
     % mark branch point as visited
     visitedBpoints(i) = true;
@@ -539,7 +547,7 @@ function newSpines = identifySpines( skeleton, segmentLabels, numSegments, bpoin
   for i = curBpoints'
     curBpointInfo = bpointInfo(:, :, i);
     adjSegments = curBpointInfo(:, 1);
-      
+    adjSegments = adjSegments(adjSegments > 0);
     % mark branch point as visited
     visitedBpoints(i) = true;
       
