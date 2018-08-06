@@ -13,7 +13,6 @@ addpath('matlab_cdf364_patch-64');
     fceTimes, fceLower, fceUpper, fceFilename, ...
     cdfDataMaster, cdfInfoMaster] = getUserInput;
   
-
     % set up parameters
     paramfilename = setparam;
     paramstring = paramfilename(1:end-4);
@@ -269,5 +268,68 @@ function [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
         filename = getFilename;
       end
     end
+  end
+
+  %------------------------------------------------------------------------
+  % getPlasmapauseIntervals
+  % Input: startDate and stopDate in datetime format
+  %        ppFilename - path to file containing intervals
+  % Output: intervals - matrix containing start and end time for each
+  %           interval
+  %------------------------------------------------------------------------
+  function [ intervals ] = getPlasmapauseIntervals( startDate, stopDate, ppFilename )
+    % open file containing plasmapause intervals
+    fileId = fopen(ppFilename, 'r');
+    % import data from file
+    intervals = textscan(fileId, '%s %s %d', 'CommentStyle', '#');
+    intervals(:,3) = [];
+    intervals = [intervals{:}];
+    % convert to datetime
+    intervals = datetime(intervals, 'Format', 'yyyy-MM-dd''T''HH:mm:ss.S');
+
+    % trim to specified interval
+    [row, ~] = find(intervals >= startDate & intervals < (stopDate + 1));
+    intervals = intervals(unique(row), :);    
+
+    %close file
+    fclose(fileId);
+  end
+  
+  %------------------------------------------------------------------------
+  % getFceLimits
+  % Input: start date and stop date in datetime format
+  %        fceFilename - path to file containing fce times and limits
+  % Output: fceTimes - time of sample
+  %         fceLower - lower limit
+  %         fceUpper - upper limit
+  %------------------------------------------------------------------------
+  function [ fceTimes, fceLower, fceUpper ] = getFceLimits( startDate, stopDate, fceFilename )
+    fileId = fopen(fceFilename, 'r');
+    % import data from file
+    data = textscan(fileId, '%s %s %s', 'CommentStyle', '#');
+    % create vector of timestamps
+    fceTimes = cell2mat(data{:,1});
+    fceTimes = datetime(fceTimes, 'Format', 'yyyy-MM-dd''T''HH:mm:ss');
+
+    % create vectors of upper and lower fce limits
+    fceLower = data{:,2};
+    fceUpper = data{:,3};
+    fillLocs = find(strcmp(data{:,2}, 'fill'))';
+    % change fill values to -1
+    for i = fillLocs
+       fceLower{i} = '-1';
+       fceUpper{i} = '-1';
+    end
+    fceLower = str2double(fceLower);
+    fceUpper = str2double(fceUpper);
+
+    % trim to start and stop dates, include data on either side for
+    % interpolation
+    interval = find(fceTimes >= startDate & fceTimes < (stopDate + 1));
+    interval = max(interval(1) - 1, 1):min(interval(end) + 2, numel(fceLower));
+    fceTimes = fceTimes(interval);
+    fceLower = (.08 * 1000) .* fceLower(interval);
+    fceUpper = (0.5 * 1000) .* fceUpper(interval);
+    fclose(fileId);
   end
 end
