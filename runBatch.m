@@ -217,8 +217,6 @@ function [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
   % confirm selections
   userConfirm =  input('\n Confirm entered values (y/n): ', 's');
   if isequal(userConfirm, 'n')
-    return
-  else
     [startDate, stopDate, snrThreshold] = getUserInput;
   end
   
