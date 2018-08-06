@@ -1,13 +1,18 @@
-function [totalRecordsBatch, batchCounts] = runBatch( startDate, stopDate, ppFilename, fceFilename, cdfMasterFile )
-% format for start and stop date 'yyyy-MM-dd'
+function runBatch
+addpath('matlab_cdf364_patch-64');
 % ppFilename is path to file containing plasmapause intervals
 % fceFilename is path to file containing upper and lower fce values for 1-5
 % minute intervals
 % cdfMasterFile is path to file containing structure of the cdf files
-
-    % time to record batch processing time
-    startDate = datetime(startDate, 'Format', 'yyyy-MM-dd');
-    stopDate = datetime(stopDate, 'Format', 'yyyy-MM-dd');
+  
+  %------------------------------------------------------------------------
+  % Set up
+  %------------------------------------------------------------------------
+  % get start date, stop date, snrThreshold and source files from user
+  [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
+    fceTimes, fceLower, fceUpper, fceFilename, ...
+    cdfDataMaster, cdfInfoMaster] = getUserInput;
+  
 
     % set up parameters
     paramfilename = setparam;
@@ -16,17 +21,8 @@ function [totalRecordsBatch, batchCounts] = runBatch( startDate, stopDate, ppFil
     % set up folders for summary images
     summaryFigBatch = setupBatchFig( startDate, stopDate, paramstring );
 
-    % import plasmapause intervals
-    ppIntervals = getPlasmapauseIntervals(startDate, stopDate, ppFilename);
-
-    % import fce limits
-    [fceTimes, fceLower, fceUpper] = getFceLimits(startDate, stopDate, fceFilename);
-
     % initialize variables
     [ batchCounts ] = initializeVariables( paramfilename );
-
-    % load info for cdf files
-    [cdfDataMaster, cdfInfoMaster] = spdfcdfread(cdfMasterFile);
 
     load(paramfilename);
     totalRecordsBatch = 0;
@@ -173,4 +169,105 @@ function [totalRecordsBatch, batchCounts] = runBatch( startDate, stopDate, ppFil
     showSummaryPanel(batchCounts, histEdges, summaryFigBatch);
     
     totalRecordsBatch
+end
+
+%--------------------------------------------------------------------------
+% getUserInput
+% Input: none
+% Output: Start and stop date in datetime format
+%         snrThreshold - features above this threshold are kept
+%         ppIntervals - valid plasmapause intervals
+%         fceTimes, fceLower, fceUpper - upper and lower fce values for the
+%           corresponding time interval
+%         cdfDataMaster and cdfInfoMaster - info loaded from the cdf
+%           template
+%         ppFilename, fceFilename - path to these files
+%--------------------------------------------------------------------------
+function [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
+  fceTimes, fceLower, fceUpper, fceFilename, ...
+  cdfDataMaster, cdfInfoMaster] = getUserInput
+  
+  % Get date range from user
+  [startDate, stopDate] = getDates;
+  
+  % get snr threshold from user
+  snrThreshold = input('\nEnter SNR threshold to be used: ');
+  
+  % confirm selections
+  userConfirm =  input('\n Confirm entered values (y/n): ', 's');
+  if isequal(userConfirm, 'n')
+    return
+  else
+    [startDate, stopDate, snrThreshold] = getUserInput;
+  end
+  
+  % load source files
+  [ppIntervals, ppFilename, fceTimes, fceLower, fceUpper, fceFilename, ...
+    cdfDataMaster, cdfInfoMaster] = loadSourceFiles(startDate, stopDate);
+  %------------------------------------------------------------------------
+  % getDates
+  % Input: none
+  % Output: startDate and stopDate in datetime format
+  %------------------------------------------------------------------------
+  function [startDate, stopDate] = getDates
+    % get start date from user
+    userStartDate = input('\nEnter start date in the following format yyyyMMdd: ', 's');
+    userEndDate = input('\nEnter end date in the following format yyyyMMdd: ', 's');
+
+    % convert dates input by user to datetime format
+    startDate = datetime(userStartDate, 'Format', 'yyyyMMdd');
+    stopDate = datetime(userEndDate, 'Format', 'yyyyMMdd');
+  end
+
+  %------------------------------------------------------------------------
+  % loadSourceFiles
+  % Input: none
+  % Output: ppIntervals, ppFilename, fceTimes, fceLower, fceFilename,
+  %         cdfDataMaster, cdfInfoMaster
+  %------------------------------------------------------------------------
+  function [ppIntervals, ppFilename, fceTimes, fceLower, fceUpper, fceFilename,...
+  cdfDataMaster, cdfInfoMaster] = loadSourceFiles(startDate, stopDate)
+    % get location of files from user
+    ppFilename = getFilename('*.txt', 'plamapause intervals');
+    fceFilename = getFilename('*.dat', 'f_ce limits');
+    cdfFilename = getFilename('*.cdf', 'cdf master template');
+  
+    % load data from files
+    ppIntervals = getPlasmapauseIntervals(startDate, stopDate, ppFilename);
+    [fceTimes, fceLower, fceUpper] = getFceLimits(startDate, stopDate, fceFilename);
+    [cdfDataMaster, cdfInfoMaster] = spdfcdfread(cdfFilename);
+  end
+
+  %------------------------------------------------------------------------
+  % getFilename
+  % Input: fileType - extension of desired file
+  %        fileContents - description of file
+  % Output: filename - path to selected file
+  %------------------------------------------------------------------------
+  function filename = getFilename(fileType, fileContents)
+    % define MException in case when no file is selected
+    msgID = 'getPPFilename:NoFileSelcted';
+    msg = ['Selection of file containing ' fileContents ' is required.'];
+    selectException = MException(msgID, msg);
+
+    % get file path from user
+    [file, path] = uigetfile(fileType, ['Select file containing ' fileContents]);
+    if isequal(file, 0)
+      % if user does not select file, throw an exception to terminate program
+      fclose('all');
+      throw(selectException);
+    else
+      filename = fullfile(path, file);
+      opts.Interpreter = 'tex';
+      opts.Default = 'Cancel';
+      displayName = strrep(filename, '\', '\\');
+      displayName = strrep(displayName, '_', '\_');
+      confirm = questdlg({'Confirm your selection.'; displayName}, ...
+          'Confirm selection', ...
+          'Ok', 'Cancel', opts);
+      if isequal(confirm, 'Cancel')
+        filename = getFilename;
+      end
+    end
+  end
 end
