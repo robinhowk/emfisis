@@ -21,17 +21,8 @@ addpath('matlab_cdf364_patch-64');
     % set up folders for summary images
     summaryFigBatch = setupBatchFig( startDate, stopDate, paramstring );
 
-    % import plasmapause intervals
-    ppIntervals = getPlasmapauseIntervals(startDate, stopDate, ppFilename);
-
-    % import fce limits
-    [fceTimes, fceLower, fceUpper] = getFceLimits(startDate, stopDate, fceFilename);
-
     % initialize variables
     [ batchCounts ] = initializeVariables( paramfilename );
-
-    % load info for cdf files
-    [cdfDataMaster, cdfInfoMaster] = spdfcdfread(cdfMasterFile);
 
     load(paramfilename);
     totalRecordsBatch = 0;
