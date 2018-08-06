@@ -46,4 +46,4 @@ other/
 source_files/
 
 # parameter mat files
-r*_t*.mat
+r*_*.mat

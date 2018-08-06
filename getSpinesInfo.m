@@ -1,5 +1,6 @@
 function spinesInfo = getSpinesInfo(spineLabels, numSpines, spect, mu1)
   % preallocate struct
+  numSpines
   spinesInfo(numSpines) = struct();
   
   for i = 1:numSpines
