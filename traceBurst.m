@@ -1,4 +1,4 @@
-function [ chorusElements, tracedElements, chorusCount ] = traceBurst( detectedElements, spine, imagefile, fspec, tspec, mu, ridges, errorLog, filename)
+function [ chorusElements, tracedElements, chorusCount ] = traceBurst( detectedElements, spine, imagefile, fspec, tspec, mu, ridges, ~, filename)
 %TRACECHORUS Summary of this function goes here
 %   Detailed explanation goes here
 
@@ -24,7 +24,7 @@ function [ chorusElements, tracedElements, chorusCount ] = traceBurst( detectedE
             deltaF = abs(freq(end) - freq(1));
             deltaFMax = max(freq) - min(freq);
             
-            if deltaF > 171 && (deltaF / deltaFMax) > 0.7 && deltaFMax > 240 && numel(timeIndexShifted) < 100
+            if numel(freqVec) < 100 && numel(freqVec) > 1 && deltaF > 171 && (deltaF / deltaFMax) > 0.7 && deltaFMax > 240 && numel(timeIndexShifted) < 100
                 [sweeprate, chorusAngle, p1, p2, p3, p4, r2, knot1, knot2, knot3, segments, lenSegments] = piecewise_regression(time, freq, mu);
                 % shift knots to correct index
                 if segments == 2
@@ -56,7 +56,7 @@ function [ chorusElements, tracedElements, chorusCount ] = traceBurst( detectedE
                 avgPsdLog = psdSumLog / length(time);
                 avgPsdPixel = psdSumPixel / length(time);
                 
-                if abs(chorusAngle) > 20 && abs(chorusAngle) < 80 && ~isnan(r2) && r2 > 0.96 && totalLen > 240 && avgPsdPixel > 19 && avgPsdLog > 49 %&& totalLen < (1.75 * deltaFMax)
+                if abs(chorusAngle) > 20 && abs(chorusAngle) < 80 && ~isnan(r2) && r2 > 0.96 && totalLen > 240 %&& avgPsdPixel > 19 && avgPsdLog > 49 %&& totalLen < (1.75 * deltaFMax)
                     
                     subimageRidges = ridgesZero(min(freqIndex):max(freqIndex), timeIndexShifted);
                     subimageSpine = spine(min(freqIndex):max(freqIndex), timeIndexShifted);
@@ -89,10 +89,12 @@ function [ chorusElements, tracedElements, chorusCount ] = traceBurst( detectedE
                         
                         if segments == 1
                             f1 = polyval(p1, tspec(timeIndexShifted));
-                            length(timeIndexShifted)
-                            for i = 1:length(f1)
+                            for i = 1:length(f1) - 1
                                ind = find(fspec > f1(i),1);
-                               if abs(fspec(ind) - f1(i)) < abs(fspec(ind-1) - f1(i))
+                               if isempty(ind)
+                                 ind = numel(fspec);
+                               end
+                               if ind > 1 && abs(fspec(ind) - f1(i)) < abs(fspec(ind-1) - f1(i))
                                    psdLine = psdLine + imagefile(ind, timeIndexShifted(1) + i - 1);
                                else
                                    psdLine = psdLine + imagefile(max(1, ind-1), timeIndexShifted(1) + i - 1);
@@ -103,19 +105,25 @@ function [ chorusElements, tracedElements, chorusCount ] = traceBurst( detectedE
                             f2 = polyval(p2, tspec(knot1 + timeIndexShifted(1) - 1:knot2 + timeIndexShifted(end)));
                             for i = 1:length(f1)
                                 ind = find(fspec > f1(i),1);
-                                if abs(fspec(ind) - f1(i)) < abs(fspec(ind-1) - f1(i))
+                                if isempty(ind)
+                                  ind = numel(fspec);
+                                end
+                                if ind > 1 && (abs(fspec(ind) - f1(i)) < abs(fspec(ind-1) - f1(i)))
                                     psdLine = psdLine + imagefile(ind, timeIndexShifted(1) + i - 1);
                                 else
-                                    psdLine = psdLine + imagefile(ind-1, timeIndexShifted(1) + i - 1);
+                                    psdLine = psdLine + imagefile(max(1, ind-1), timeIndexShifted(1) + i - 1);
                                 end
                             end
                             
                             for i = 2:length(f2)
                                 ind = find(fspec > f2(i),1);
-                                if abs(fspec(ind) - f2(i)) < abs(fspec(ind-1) - f2(i))
+                                if isempty(ind)
+                                  ind = numel(fspec);
+                                end
+                                if ind > 1 && abs(fspec(ind) - f2(i)) < abs(fspec(ind-1) - f2(i))
                                     psdLine = psdLine + imagefile(ind, knot1 + timeIndexShifted(1) - 1 + i);
                                 else
-                                    psdLine = psdLine + imagefile(ind-1, knot1 + timeIndexShifted(1) - 1 + i);
+                                    psdLine = psdLine + imagefile( max(ind-1, 1), knot1 + timeIndexShifted(1) - 1 + i);
                                 end
                             end
                         elseif segments == 3
@@ -125,32 +133,41 @@ function [ chorusElements, tracedElements, chorusCount ] = traceBurst( detectedE
                             
                             for i = 1:length(f1)
                                 ind = find(fspec > f1(i),1);
-                                if abs(fspec(ind) - f1(i)) < abs(fspec(ind-1) - f1(i))
+                                if isempty(ind)
+                                  ind = numel(fspec);
+                                end
+                                if ind > 1 && abs(fspec(ind) - f1(i)) < abs(fspec(ind-1) - f1(i))
                                     psdLine = psdLine + imagefile(ind, timeIndexShifted(1) + i - 1);
                                 else
-                                    psdLine = psdLine + imagefile(ind-1, timeIndexShifted(1) + i - 1);
+                                    psdLine = psdLine + imagefile(max(1, ind-1), timeIndexShifted(1) + i - 1);
                                 end
                             end
                             
                             for i = 2:length(f2)
                                 ind = find(fspec > f2(i),1);
-                                if abs(fspec(ind) - f2(i)) < abs(fspec(ind-1) - f2(i))
+                                if isempty(ind)
+                                  ind = numel(fspec);
+                                end
+                                if ind > 1 && abs(fspec(ind) - f2(i)) < abs(fspec(ind-1) - f2(i))
                                     psdLine = psdLine + imagefile(ind, knot1 + timeIndexShifted(1) - 1 + i);
                                 else
-                                    psdLine = psdLine + imagefile(ind-1, knot1 + timeIndexShifted(1) - 1 + i);
+                                    psdLine = psdLine + imagefile(max(ind-1, 1), knot1 + timeIndexShifted(1) - 1 + i);
                                 end
                             end
                             
                             for i = 2:length(f3)
                                 ind = find(fspec > f3(i),1);
-                                if abs(fspec(ind) - f3(i)) < abs(fspec(ind-1) - f3(i))
+                                if isempty(ind)
+                                  ind = numel(fspec);
+                                end
+                                if ind > 1 && abs(fspec(ind) - f3(i)) < abs(fspec(ind-1) - f3(i))
                                     psdLine = psdLine + imagefile(ind, knot2 + timeIndexShifted(1) - 1 + i);
                                 else
-                                    psdLine = psdLine + imagefile(ind-1, knot2 + timeIndexShifted(1) - 1 + i);
+                                    psdLine = psdLine + imagefile(max(ind-1, 1), knot2 + timeIndexShifted(1) - 1 + i);
                                 end
                             end
                         end
-                        
+                       
                         % update struct of chorus elemnts
                          % create struct and add to array of elements
                         chorusElements(chorusCount).start = struct('time', timeIndexShifted(1), 'freq', freqIndex(1), 'branch_point', 0);

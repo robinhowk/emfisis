@@ -1,10 +1,10 @@
-function showBurstFigure( tspec, fspec, imagefile1, snrMap, ...
+function showBurstFigure( tspec, fspec, spect, snrMap, ...
   ridges, snrThreshold, spine, tracedElements, chorusElements, ...
   chorusCount, edges, figname )
 
   summary = figure('visible', 'off');
   h1 = subplot(4,2,1);
-  imagesc(tspec, fspec, imagefile1);
+  imagesc(tspec, fspec, spect);
   colormap(h1, jet);
   c = colorbar;
   title(h1, '(1) Original Spectrogram');
@@ -12,6 +12,7 @@ function showBurstFigure( tspec, fspec, imagefile1, snrMap, ...
   ylabel(h1, 'Frequency (Hz)');
   title(c, '10*log10(psd)');
   set(h1, 'YDir', 'normal');
+  caxis([-160 -30]);
     
   h7 = subplot(4,2,2);
   imagesc(tspec, fspec, snrMap);
@@ -22,6 +23,7 @@ function showBurstFigure( tspec, fspec, imagefile1, snrMap, ...
   ylabel(h7, 'Frequency (Hz)');
   title(c, 'SNR');
   set(h7, 'ydir', 'normal');
+  caxis([0 13]);
   
   h2 = subplot(4,2,3);
   ridges(ridges == min(ridges(:))) = NaN;
@@ -34,9 +36,11 @@ function showBurstFigure( tspec, fspec, imagefile1, snrMap, ...
   ylabel(h2, 'Frequency (Hz)');
   title(c, '10*log10(psd)');
   set(h2, 'YDir', 'normal');
+  caxis([-160 -30]);
     
   h3 = subplot(4,2,4);
   spine(spine == min(spine(:))) = NaN;
+  spine = spine + min(spect(:));
   pcolor(tspec, fspec, spine);
   shading(h3, 'flat');
   colormap(h3, jet);
@@ -46,6 +50,7 @@ function showBurstFigure( tspec, fspec, imagefile1, snrMap, ...
   ylabel(h3, 'Frequency (Hz)');
   title(c, '10*log10(psd)');
   set(h3, 'YDir', 'normal');
+  caxis([-160 -30]);
     
   h4 = subplot(4,2,5);
   imagesc(tspec, fspec, tracedElements);
@@ -109,7 +114,7 @@ function showBurstFigure( tspec, fspec, imagefile1, snrMap, ...
   hold off;
    
   h8 = subplot(4,2,7);
-  imagesc(tspec, fspec, imagefile1);
+  imagesc(tspec, fspec, spect);
   shading(h8, 'flat');
   colormap(h8, jet);
   c = colorbar;
@@ -125,14 +130,14 @@ function showBurstFigure( tspec, fspec, imagefile1, snrMap, ...
       if segments == 1
          t1 = tspec(chorusElements(ind).start.time:chorusElements(ind).stop.time);
          f1 = polyval(chorusElements(ind).piecewiseResults.p1, t1);
-         plot(t1, f1, 'k');
+         plot(t1, f1, 'k', 'linewidth', 1);
       elseif segments == 2
          t1 = tspec(chorusElements(ind).start.time:chorusElements(ind).piecewiseResults.knot1);
          t2 = tspec(chorusElements(ind).piecewiseResults.knot1:chorusElements(ind).stop.time);
          f1 = polyval(chorusElements(ind).piecewiseResults.p1, t1);
          f2 = polyval(chorusElements(ind).piecewiseResults.p2, t2);
-         plot(t1, f1, 'k');
-         plot(t2, f2, 'k');
+         plot(t1, f1, 'k', 'linewidth', 1);
+         plot(t2, f2, 'k', 'linewidth', 1);
       elseif segments == 3
          t1 = tspec(chorusElements(ind).start.time:chorusElements(ind).piecewiseResults.knot1);
          t2 = tspec(chorusElements(ind).piecewiseResults.knot1:chorusElements(ind).piecewiseResults.knot2);
@@ -140,9 +145,9 @@ function showBurstFigure( tspec, fspec, imagefile1, snrMap, ...
          f1 = polyval(chorusElements(ind).piecewiseResults.p1, t1);
          f2 = polyval(chorusElements(ind).piecewiseResults.p2, t2);
          f3 = polyval(chorusElements(ind).piecewiseResults.p3, t3);
-         plot(t1, f1, 'k');
-         plot(t2, f2, 'k');
-         plot(t3, f3, 'k');
+         plot(t1, f1, 'k', 'linewidth', 1);
+         plot(t2, f2, 'k', 'linewidth', 1);
+         plot(t3, f3, 'k', 'linewidth', 1);
       else
          t1 = tspec(chorusElements(ind).start.time:chorusElements(ind).piecewiseResults.knot1);
          t2 = tspec(chorusElements(ind).piecewiseResults.knot1:chorusElements(ind).piecewiseResults.knot2);
@@ -152,13 +157,14 @@ function showBurstFigure( tspec, fspec, imagefile1, snrMap, ...
          f2 = polyval(chorusElements(ind).piecewiseResults.p2, t2);
          f3 = polyval(chorusElements(ind).piecewiseResults.p3, t3);
          f4 = polyval(chorusElements(ind).piecewiseResults.p4, t4);
-         plot(t1, f1, 'k');
-         plot(t2, f2, 'k');
-         plot(t3, f3, 'k');
-         plot(t4, f4, 'k');
+         plot(t1, f1, 'k', 'linewidth', 1);
+         plot(t2, f2, 'k', 'linewidth', 1);
+         plot(t3, f3, 'k', 'linewidth', 1);
+         plot(t4, f4, 'k', 'linewidth', 1);
       end
   end
   hold off;
+  caxis([-160, -30]);
   
   h6 = subplot(4,2,8);
   if chorusCount > 0

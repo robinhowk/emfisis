@@ -124,7 +124,7 @@ t1 = tic;
             traceBurst( bwSpine, spine, imagefile, fspec, tspec, mu1, ...
             features, errorLogId, filename);
 
-          % create figure
+          % create figure   
           showBurstFigure(tspec, fspec, spect, snrMap, features, ...
             snrThreshold, spine, tracedElements, chorusElements, ...
             chorusCount, histEdges.sweeprates, figname);
@@ -135,10 +135,11 @@ t1 = tic;
                 numEntries = 1000;
                 % reallocate array sizes, add room for 1000
                 % more entries
+                size(cdfData.frequency)
                 cdfData.chorusEpoch = [cdfData.chorusEpoch; int64(zeros(numEntries, cdfInfoMaster.Variables{1,2}(1)))];
                 cdfData.frequency =  [cdfData.frequency; cdfInfoMaster.VariableAttributes.FILLVAL{4,2} * ones(numEntries, cdfInfoMaster.Variables{4,2}(1))];
                 cdfData.psd =  [cdfData.psd; cdfInfoMaster.VariableAttributes.FILLVAL{5,2} * ones(numEntries, cdfInfoMaster.Variables{5,2}(1))];
-                cdfData.sweeprates = [cdfData.sweeprates; cdfInfoMaster.VariableAttributes.FILLVAL{6,2} * ones(numEntries, cdfInfoMaster.Variables{6,2}(1))];
+                cdfData.sweeprate = [double(cdfData.sweeprate); single(cdfInfoMaster.VariableAttributes.FILLVAL{6,2}) * ones(numEntries, cdfInfoMaster.Variables{6,2}(1))];
                 cdfData.burst = [cdfData.burst; int32(zeros(numEntries, cdfInfoMaster.Variables{7,2}(1)))];
                 cdfData.chorusIndex = [cdfData.chorusIndex; int32(zeros(numEntries, cdfInfoMaster.Variables{8,2}(1)))];
             end
@@ -191,8 +192,8 @@ t1 = tic;
     end
 
     % create summary histograms for day
-    daySummaryFigFile = sprintf('%s/%04d%02d%02d_a_%s_summary_%s.jpg', ...
-      figFolder, date.Year, date.Month, date.Day, paramstring, version);
+    daySummaryFigFile = sprintf('%s/%04d%02d%02d_rbsp-a_summary_%s.jpg', ...
+      figFolder, iDate.Year, iDate.Month, iDate.Day, version);
     showSummaryPanel(countsDay, histEdges, daySummaryFigFile);
 
     % update batch totals
@@ -347,7 +348,7 @@ function destinationFile = getBurstSummaryDestination(startDate, stopDate, versi
 end
 
 function showSummaryPanel( counts, edges, destinationFile )
-  summary = figure('visibility', 'off');
+  summary = figure('visible', 'off');
   % plot hourly totals
   h1 = subplot(3, 1, 1);
   bar(0:1:23, counts.hourlyTotals, 'histc');
