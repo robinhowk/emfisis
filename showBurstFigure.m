@@ -36,11 +36,13 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ...
   pcolor(tspec, fspec, features);
   colormap(h2, jet);
   c = colorbar;
+  title(c, '10*log10(psd)');
   title(h3, sprintf('(3) Features with SNR > %d', snrThreshold));
   xlabel(h3, 'Duration of event (in seconds)');
   ylabel(h3, 'Frequency (Hz)');
   title(c, '10*log10(psd)');
   set(h3, 'YDir', 'normal');
+  caxis([-160, -30]);
 
   % spine segments
   h4 = subplot(4,2,4);
@@ -67,6 +69,8 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ...
   imagesc(tspec, fspec, spect);
   colormap(h6, jet);
   colorbar;
+  caxis([-160, -30]);
+  title(c, '10*log10(psd)');
   title(h6, '(6) Spectrogram with Identified Spines');
   xlabel(h6, 'Duration of event in seconds');
   ylabel(h6, 'Frequency (Hz)');
@@ -82,6 +86,8 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ...
   imagesc(tspec, fspec, spect);
   colormap(h7, jet);
   colorbar;
+  caxis([-160, -30]);
+  title(c, '10*log10(psd)');
   title(h7, '(7) Spines with 1st Degree Line of Best Fit');
   xlabel(h7, 'Duration of event in seconds');
   ylabel(h7, 'Frequency (Hz)');
@@ -101,6 +107,8 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ...
   imagesc(tspec, fspec, spect);
   colormap(h8, jet);
   colorbar;
+  caxis([-160, -30]);
+  title(c, '10*log10(psd)');
   title(h8, '(8) Spines with 3rd Degree Line of Best Fit');
   xlabel(h8, 'Duration of event in seconds');
   ylabel(h8, 'Frequency (Hz)');
