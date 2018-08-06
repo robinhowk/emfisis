@@ -12,6 +12,7 @@ function [ skeleton, segmentLabels, spineLabels, numSpines, spines ] = findSpine
   bpointInfo = classifyBpoints( segmentLabels, bpoints, epoints );
 
   [spineLabels, numSpines] = identifySpines( skeleton, segmentLabels, numSegments, bpoints, bpointInfo );
+  
   spines = zeros(size(spineLabels));
   spines(spineLabels > 0) = 1;
 end

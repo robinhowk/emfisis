@@ -4,7 +4,8 @@ addpath('matlab_cdf364_patch-64');
 % fceFilename is path to file containing upper and lower fce values for 1-5
 % minute intervals
 % cdfMasterFile is path to file containing structure of the cdf files
-  
+  % start time
+  t1 = tic;
   %------------------------------------------------------------------------
   % Set up
   %------------------------------------------------------------------------
@@ -13,161 +14,182 @@ addpath('matlab_cdf364_patch-64');
     fceTimes, fceLower, fceUpper, fceFilename, ...
     cdfDataMaster, cdfInfoMaster] = getUserInput;
   
-    % set up parameters
-    paramfilename = setparam;
-    paramstring = paramfilename(1:end-4);
+  version = '2.1.1';
+  
+  % load parameters
+  paramfilename = setparam;
+  paramstring = paramfilename(1:end-4);
+  load(paramfilename);
 
-    % set up folders for summary images
-    summaryFigBatch = setupBatchFig( startDate, stopDate, paramstring );
-
-    % initialize variables
-    [ batchCounts ] = initializeVariables( paramfilename );
-
-    load(paramfilename);
-    totalRecordsBatch = 0;
+  % initialize batch counts
+  countsBatch = initializeCounts(histEdges, 0);
+  totalRecordsBatch = 0;
+  
+  % get destination file for summary panel
+  batchSummaryFigFile = getBatchSummaryDestination(startDate, stopDate, version);
     
-    for iDate = startDate:stopDate
-
-        % set up image folders and filenames for day
-        [ figFolder, summaryFigDay] = setupDayFigFolder( iDate, paramstring );
-
-        % set up folders and filename for saving data
-        [ dataPath, resultsFolder ] = setupDataFolderDay (iDate);
-
-        % set up cdf file
-        [ cdfFilename ] = setupCdfFile( iDate );
-
-        % initialize list of files for the day
-        filelist = dir(fullfile(dataPath, '*.mat'));
-
-        dayCounts = struct('chorusAngles', zeros(1, length(histEdges.chorusAngles) - 1), ...
-                'sweeprates', zeros(1, length(histEdges.sweeprates) - 1), ...
-                'hourlyTotals', zeros(1, 24), ...
-                'psdSums', zeros(1,500), ...
-                'sweepratesList', zeros(1,500));
+  %------------------------------------------------------------------------
+  % process each burst
+  %------------------------------------------------------------------------
+  for iDate = startDate:stopDate
+    % start timer
+    t2 = tic;
+    
+    %----------------------------------------------------------------------
+    % Initialize daily variables
+    % set datapath for mat files for this day
+    % create folders for storing results
+    % get list of all mat files for this day
+    % initialize counts for tracking daily totals
+    % create structure for storing data to be written to cdfs
+    %----------------------------------------------------------------------
+    % set data path for current day
+    dataPath = sprintf('mat/%04d/%02d/%02d', iDate.Year, iDate.Month, iDate.Day);
+    
+    % create folders where results and figures will be saved
+    [resultsFolder, figFolder, cdfFolder] = createFolders(dataPath, iDate, version);
+    
+    % get list of files
+    filelist = dir(fullfile(dataPath, '*.mat'));
+    
+    % initilize struct for tracking daily totalts
+    countsDay = initializeCounts(histEdges, 500);
+    numRecords = 0;
+    totalRecordsDay = 0;
+    
+    dayCounts = struct('chorusAngles', zeros(1, length(histEdges.chorusAngles) - 1), ...
+      'sweeprates', zeros(1, length(histEdges.sweeprates) - 1), ...
+      'hourlyTotals', zeros(1, 24), ...
+      'psdSums', zeros(1,500), ...
+      'sweepratesList', zeros(1,500));
             
-        % set up variables for cdf data for the day
-        cdfData = setupCdfRecords(cdfInfoMaster);
-        numRecords = 0;
-        totalRecordsDay = 0;
-        skipped = {};
-        numSkipped = 0;
+    % set up variables for cdf data for the day
+    cdfData = setupCdfRecords(cdfInfoMaster);
+     
+    %----------------------------------------------------------------------
+    % process each file for the day
+    %----------------------------------------------------------------------
+    for iFile = 1:size(filelist, 1)
+      % get file path for burst
+      filename = filelist(iFile).name
+      datafilename = sprintf('%s/%s', dataPath, filename);
+      data = load(datafilename);
+      fspec = data.fspec;
+      tspec = data.tspec;
+      imagefile = data.imagefile;
+      timestamp = data.timestamp
+            
+      %--------------------------------------------------------------------
+      % check if current burst falls within a valid plasmapause interval. 
+      % If so, trim spectrogram, scale to 10log10 and continue processing 
+      % burst.
+      %--------------------------------------------------------------------
+      % continue if in plasmapause interval
+      if find(timestamp <= ppIntervals(:,2) & ...
+          (timestamp + seconds(6)) > ppIntervals(:,1))
+        % create filename for result and figure to be saved
+        figname = sprintf('%s/%s_%s.jpg', figFolder, strtok(filename, '.'), version);
+        resultFilename = sprintf('%s/%s_%s.mat', resultsFolder, strtok(filename, '.'), version);
         
-        for iFile = 1:size(filelist, 1)
-            % get file path for burst
-            filename = filelist(iFile).name
-            datafilename = sprintf('%s/%s', dataPath, filename);
-            burstVar = load(datafilename);
-            tspec = burstVar.tspec;
-            fspec = burstVar.fspec;
-            imagefile = burstVar.imagefile;
-            timestamp = burstVar.timestamp;
-            
-            % continue if in plasmapause interval
-            if find(timestamp <= ppIntervals(:,2) & (timestamp + seconds(6)) > ppIntervals(:,1))
-                % check a fceTime falls inside the burst
-                fceInd = find(timestamp >= fceTimes & timestamp + seconds(6) <= fceTimes);
-                if numel(fceInd) == 1
-                    fLow = fceLower(fceInd);
-                    fHigh = fceUpper(fceInd);
-                else
-                    tmid = timestamp + seconds(tspec(end))/2;
-                    next = find(fceTimes > tmid, 1, 'first');
-                    prev = next - 1;
-                    fLow = interpFce(fceTimes(prev), fceTimes(next), tmid, fceLower(prev), fceLower(next));
-                    fHigh = interpFce(fceTimes(prev), fceTimes(next), tmid, fceUpper(prev), fceUpper(next));
-                end
+        % create spectrogram
+        [spect, fspec, isValid] = trimSpectrogram(timestamp, imagefile, ...
+          tspec, fspec, fceTimes, fceLower, fceUpper);
+        
+        % create snr map of burst and select features about a given 
+        % threshold
+        [ snrMap, features ] = mapSnr( spect, imagefile, snrThreshold );
                 
-                % if there was no valid fce limits skip this burst
-                if ~isnan(fLow)
-                    spect = 10*log10(imagefile);
-                    [spect, fspec] = trimSpect(spect, fspec, fLow, fHigh);
-                    
-                    % setup burst information for processing
-                    figname = sprintf('%s/%s_%s.jpg', figFolder, strtok(filename, '.'), paramstring);
-                    resultFilename = sprintf('%s/%s_result.mat', resultsFolder, strtok(filename, '.'));
-                    % calculate ridge transform
-                    ridges = find_chorus(paramfilename, spect);
-                    % calculate spines
-                    spines = findSpines(ridges);
-                    [spinesSnr, spineSegments, numSegments] = fitSpines(spines, spect, 5);                    
-%                     spinesSnr = removeNoise(spinesSnr);
-                    [spinesFinal, chorusCount, chorusElements] = selectSpines(spineSegments, numSegments, tspec, fspec, imagefile, spect, mu1);
-                    
-                    if chorusCount > 0
-                        if numRecords + chorusCount > numel(cdfData.chorusEpoch)
-                            numEntries = 1000;
-                            % reallocate array sizes, add room for 1000
-                            % more entries
-                            cdfData.chorusEpoch = [cdfData.chorusEpoch; int64(zeros(numEntries, cdfInfoMaster.Variables{1,2}(1)))];
-                            cdfData.frequency =  [cdfData.frequency; cdfInfoMaster.VariableAttributes.FILLVAL{4,2} * ones(numEntries, cdfInfoMaster.Variables{4,2}(1))];
-                            cdfData.psd =  [cdfData.psd; cdfInfoMaster.VariableAttributes.FILLVAL{5,2} * ones(numEntries, cdfInfoMaster.Variables{5,2}(1))];
-                            cdfData.sweeprate = [cdfData.sweeprate; single(cdfInfoMaster.VariableAttributes.FILLVAL{6,2}) * ones(numEntries, cdfInfoMaster.Variables{6,2}(1))];
-                            cdfData.burst = [cdfData.burst; int32(zeros(numEntries, cdfInfoMaster.Variables{7,2}(1)))];
-                            cdfData.chorusIndex = [cdfData.chorusIndex; int32(zeros(numEntries, cdfInfoMaster.Variables{8,2}(1)))];
-                        end
-                            % getHistCounts
-                            burstCounts = getHistCounts(chorusElements, histEdges);
-                            dayCounts.chorusAngles = dayCounts.chorusAngles + burstCounts.chorusAngles;
-                            dayCounts.sweeprates = dayCounts.sweeprates + burstCounts.sweeprates;
-                            dayCounts.hourlyTotals(timestamp.Hour + 1) = dayCounts.hourlyTotals(timestamp.Hour + 1) + chorusCount;
-                         
-                            [cdfData, numRecords] = updateCdfRecords(cdfData, chorusElements, timestamp, tspec, fspec, str2double(filename(13:15)), numRecords);
-                            
-                            % add to record count
-                            totalRecordsDay = totalRecordsDay + chorusCount;
-                            
-                            showBurstFigure( tspec, fspec, spect, ridges, timestamp, spines, spinesSnr, spinesFinal, chorusElements, chorusCount, histEdges.sweeprates, figname, fLow, fHigh )
-                        
-                    end
-                        
-                        % save mat file
-                        save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', 'ridges', ...
-                            'spinesFinal',  'paramfilename', 'timestamp');
-                else
-                    numSkipped = numSkipped + 1;
-                    skipped{numSkipped} = {fprintf('%s, %s', datestr(timestamp), filename)};
-                end % end of burst
+        % if features are found continue
+        if ~isnan(sum(features(:))) && isValid
+          % find spine of detected features
+          [skeleton, segmentLabels, spineLabels, numSpines, spines] = findSpines(features);
+          
+          % get information about each spine
+          chorusElements = getSpinesInfo(spineLabels, numSpines, spect, mu1);
+          
+          
+          % create figure
+          showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ...
+            features, segmentLabels, spineLabels, spines, timestamp, ...
+            chorusElements, chorusCount, figname, fLow, fHigh );
+          
+          if numSpines > 0
+            if numRecords + numSpines > numel(cdfData.chorusEpoch)
+              numEntries = 1000;
+              % reallocate array sizes, add room for 1000
+              % more entries
+              cdfData.chorusEpoch = [cdfData.chorusEpoch; int64(zeros(numEntries, cdfInfoMaster.Variables{1,2}(1)))];
+              cdfData.frequency =  [cdfData.frequency; cdfInfoMaster.VariableAttributes.FILLVAL{4,2} * ones(numEntries, cdfInfoMaster.Variables{4,2}(1))];
+              cdfData.psd =  [cdfData.psd; cdfInfoMaster.VariableAttributes.FILLVAL{5,2} * ones(numEntries, cdfInfoMaster.Variables{5,2}(1))];
+              cdfData.sweeprates = [cdfData.sweeprates; cdfInfoMaster.VariableAttributes.FILLVAL{6,2} * ones(numEntries, cdfInfoMaster.Variables{6,2}(1))];
+              cdfData.burst = [cdfData.burst; int32(zeros(numEntries, cdfInfoMaster.Variables{7,2}(1)))];
             end
-            close all;
-        end % end of bursts loop
+            
+            % getHistCounts
+            burstCounts = getHistCounts(chorusElements, histEdges);
+            dayCounts.chorusAngles = dayCounts.chorusAngles + burstCounts.chorusAngles;
+            dayCounts.sweeprates = dayCounts.sweeprates + burstCounts.sweeprates;
+            dayCounts.hourlyTotals(timestamp.Hour + 1) = dayCounts.hourlyTotals(timestamp.Hour + 1) + numSpines;
+
+            [cdfData, numRecords] = updateCdfRecords(cdfData, chorusElements, timestamp, tspec, fspec, str2double(filename(13:15)), numRecords);
+
+            % add to record count
+            totalRecordsDay = totalRecordsDay + numSpines;
+
+            showBurstFigure( tspec, fspec, spect, ridges, timestamp, spines, spinesSnr, spinesFinal, chorusElements, numSpines, histEdges.sweeprates, figname, fLow, fHigh )
+          end
+                        
+          % save mat file
+          save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
+            'snrMap', 'features', 'skeleton', 'segmentLabels', ...
+            'spineLabels', 'numSpines', 'spines', 'spinesInfo', ...
+            'paramfilename', 'timestamp');
+        else
+          % save mat file
+            save(resultFilename, 'imagefile', 'spect', 'fspec', ...
+              'tspec', 'features', 'paramfilename', 'timestamp');
+        end % end of burst
+      else
+        % no ridges, save mat file
+        save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
+          'paramfilename', 'timestamp');
+      end
+      close all;
+    end % end of bursts loop
         
-        % save cdf file for day
-        if totalRecordsDay > 0
-            writeToCdf( cdfFilename, cdfDataMaster, cdfInfoMaster, cdfData, numRecords, ppFilename, fceFilename, timestamp, tspec(1) );
-        end
+    % save cdf file for day
+    if totalRecordsDay > 0
+      sourceFiles = getSourceFiles( ppFilename, fceFilename, timestamp);
+      writeToCdf( cdfFolder, version, date, cdfDataMaster, cdfInfoMaster, ...
+        cdfData, numRecords, tspec(1), sourceFiles );
+    end
         
-         % create summary histograms for day
-        showSummaryPanel(dayCounts, histEdges, summaryFigDay);
+    % create summary histograms for day
+    daySummaryFigFile = sprintf('%s/%04d%02d%02d_a_%s_summary_%s.jpg', ...
+      figFolder, date.Year, date.Month, date.Day, paramstring, version);
+    showSummaryPanel(countsDay, histEdges, daySummaryFigFile);
         
-        % write skipped bursts to file
-        if numSkipped > 0
-            skippedFilename = sprintf('docs/skipped/rbspa/%04d%02d%02d_skipped_bursts', iDate.Year, iDate.Month, iDate.Day);
-            fid = fopen(skippedFilename, 'wt');
-            for n = 1:numSkipped
-               fprintf(fid, '%s\n', skippedFilename{n}{:});
-            end
-            fclose(fid);
-        end
-        % update batch totals
-        batchCounts.chorusAngles = batchCounts.chorusAngles + dayCounts.chorusAngles;
-        batchCounts.sweeprates = batchCounts.sweeprates + dayCounts.sweeprates;
-        batchCounts.hourlyTotals = batchCounts.hourlyTotals + dayCounts.hourlyTotals;
+    % update batch totals
+    countsBatch.chorusAngles = countsBatch.chorusAngles + dayCounts.chorusAngles;
+    countsBatch.sweeprates = countsBatch.sweeprates + dayCounts.sweeprates;
+    countsBatch.hourlyTotals = countsBatch.hourlyTotals + dayCounts.hourlyTotals;
 %         batchCounts.psdSums = [batchCounts.psdSums, dayCounts.psdSums(1:totalRecordsDay)];
 %         batchCounts.sweepratesList = [batchCounts.sweepratesList, dayCounts.sweepratesList(1:totalRecordsDay)];
         
-        % update total records for batch
-        totalRecordsBatch = totalRecordsBatch + totalRecordsDay;
-        iDate
-        totalRecordsDay
-    end % end of days loop
-    % close all files
-    fclose('all');
+    % update total records for batch
+    totalRecordsBatch = totalRecordsBatch + totalRecordsDay;
+    iDate
+    totalRecordsDay
+    toc(t2)
+  end % end of days loop
+  % close all files
+  fclose('all');
     
-    % create summary histograms for batch
-    showSummaryPanel(batchCounts, histEdges, summaryFigBatch);
+  % create summary histograms for batch
+  showSummaryPanel(countsBatch, histEdges, batchSummaryFigFile);
     
-    totalRecordsBatch
+  totalRecordsBatch
+  toc(t1)
 end
 
 %--------------------------------------------------------------------------
@@ -332,4 +354,313 @@ function [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
     fceUpper = (0.5 * 1000) .* fceUpper(interval);
     fclose(fileId);
   end
+end
+
+%--------------------------------------------------------------------------
+% Input: histEdges - limits of histograms for chorus angles and sweeprates
+%        defaultNum - number of entries to be initialized
+% Output: counts - strcut of variables to be tracked
+%--------------------------------------------------------------------------
+function counts = initializeCounts(histEdges, defaultNum)
+  % chorusAnglesBatch - hist counts for chorus angles
+  % sweepratesBatch - hist counts for sweeprates
+  chorusAngles = zeros(1, length(histEdges.chorusAngles) - 1);
+  sweeprates = zeros(1, length(histEdges.sweeprates) - 1);
+  hourTotals = zeros(1, 24);
+  if defaultNum == 0
+    psdSums = [];
+    sweepratesList = [];
+  else
+    psdSums = zeros(1, defaultNum);
+    sweepratesList = zeros(1, defaultNum);
+  end
+
+  counts = struct('chorusAngles', chorusAngles, ...
+                       'sweeprates', sweeprates, ...
+                       'hourlyTotals', hourTotals, ...
+                       'psdSums', psdSums, ...
+                       'sweepratesList', sweepratesList);
+end
+
+%--------------------------------------------------------------------------
+% getBatchSummaryDestination
+% Input: start date and stop date in datetime format
+%        version: software version number as a string
+% Output: destinationFile - path to where file will be saved
+%--------------------------------------------------------------------------
+% gets location where summary panel for the batch is saved
+function destinationFile = getBatchSummaryDestination(startDate, stopDate, version)
+  % create filename for summary image for batch, save in current months folder
+  destinationFolder = sprintf('%s/rbsp-a/figures/%04d/%02d', version, startDate.Year, startDate.Month);
+  
+  if exist(destinationFolder, 'dir') == 0
+    mkdir(destinationFolder)
+  end
+    
+  destinationFile = sprintf('%s/%04d%02d%02d_to_%04d%02d%02d_rbsp-a_summary.jpg', ...
+    destinationFolder, startDate.Year, startDate.Month, startDate.Day, ...
+    stopDate.Year, stopDate.Month, stopDate.Day);
+end
+
+%--------------------------------------------------------------------------
+% showSummaryPanel
+% Input: counts - totals to be displayed
+%        edges - limits of histograms for sweeprates and chorus angles
+%        destination file - path where image will be saved
+% Output: none
+%--------------------------------------------------------------------------
+function showSummaryPanel( counts, edges, destinationFile )
+  summary = figure('visibility', 'off');
+  % plot hourly totals
+  h1 = subplot(3, 1, 1);
+  bar(0:1:23, counts.hourlyTotals, 'histc');
+  axis(h1, 'tight');
+  title(h1, 'Total Chorus, By Hour');
+  xlabel('Hour');
+  ylabel('Total Chorus');
+
+  % distribution of sweeprates
+  h2 = subplot(3,1,2);
+  bins = (edges.sweeprates(1:end-1) + edges.sweeprates(2:end)) / 2;
+  bar(bins, counts.sweeprates / sum(counts.sweeprates), 'histc');
+  axis(h2, 'tight');
+  title(h2, 'Distribution of Sweeprates');
+  xlabel('Sweeprate (KHz / sec)');
+  ylabel('Estimated\newlineprobability');
+
+  h3 = subplot(3,1,3);
+  bins = (edges.chorusAngles(1:end-1) + edges.chorusAngles(2:end)) / 2;
+  bar(bins, counts.chorusAngles / sum(counts.chorusAngles), 'histc');
+  axis(h3, 'tight');
+  title(h3, 'Distribution of Chorus Angles');
+  ylabel('Estimated\newlineprobability');
+  
+  % render image maximized to screen
+  set(gcf, 'Position', get(0, 'Screensize'));
+  % save figure
+  saveas(summary, destinationFile);
+  close all
+end
+
+%--------------------------------------------------------------------------
+% createFolders
+% Input: datapath - path where data is to be stored
+%        date - date of burst
+%        version - software version number
+% Output: path to results folder, figures folder and cdf folder
+%--------------------------------------------------------------------------
+function [resultsFolder, figFolder, cdfFolder] = createFolders(datapath, date, version)
+    
+  resultsFolder = sprintf('%s/rbsp-a/data/%s', version, datapath);
+  figFolder = sprintf('%s/rbsp-a/figures/%04d/%02d/%02d', version, date.Year, date.Month, date.Day);
+  cdfFolder = sprintf('%s/rbsp-a/data/cdf/%04d/%02d', version, date.Year, date.Month);
+  
+  % create directories if they do not exist
+  if ~exist(resultsFolder, 'dir')
+    mkdir(resultsFolder);
+  end
+  
+  if ~exist(figFolder, 'dir')
+    mkdir(figFolder); 
+  end
+  
+  if ~exist(cdfFolder, 'dir')
+    mkdir(cdfFolder)
+  end
+end
+
+%--------------------------------------------------------------------------
+%
+%
+%
+%--------------------------------------------------------------------------
+function [spect, fspec, isValid] = trimSpectrogram(timestamp, ...
+  imagefile, tspec, fspec, fceTimes, fceLower, fceUpper)
+  
+  % check a fceTime falls inside the burst
+  fceInd = find(timestamp >= fceTimes & timestamp + seconds(6) <= fceTimes);
+  if numel(fceInd) == 1
+    fLow = fceLower(fceInd);
+    fHigh = fceUpper(fceInd);
+  else
+    tmid = timestamp + seconds(tspec(end))/2;
+    next = find(fceTimes > tmid, 1, 'first');
+    prev = next - 1;
+    fLow = interpFce(fceTimes(prev), fceTimes(next), tmid, fceLower(prev), fceLower(next));
+    fHigh = interpFce(fceTimes(prev), fceTimes(next), tmid, fceUpper(prev), fceUpper(next));
+  end
+
+  % if there was no valid fce limits set fspec to an empty vector
+  spect = 10*log10(imagefile);
+  if ~isnan(fLow)
+    low = find(fspec > fLow, 1, 'first');
+    low = low - 1;
+    high = find(fspec > fHigh, 1, 'first');
+    low = min(max(1, low), numel(fspec));
+    high = max(min(numel(fspec), high), 1);
+    if low ~= high
+        fspec = fspec(low:high);
+        spect = spect(low:high, :);
+    end
+    isValid = true;
+  else
+    isValid = false;
+  end
+  
+  %------------------------------------------------------------------------
+  %
+  %
+  %
+  %------------------------------------------------------------------------
+  function [ interpValue ] = interpFce( prevTime, nextTime, curTime, prevFce, nextFce )
+    %Interpolates Fce Values based on given timestamp. Returns the upper and
+    %lower fce limits. Linear interpolation is used on curTime between prevTime 
+    %and nextTime to find these values.
+        if prevFce < 0 || nextFce < 0
+            interpValue = NaN;
+            return
+        end
+
+        prevTime = datenum(prevTime);
+        nextTime = datenum(nextTime);
+        curTime = datenum(curTime);
+
+        % intermediate values used for calculation
+        a = (nextFce - prevFce) / (nextTime - prevTime);
+        b = curTime - prevTime;
+
+        % interpolated value
+        interpValue = prevFce + (a * b);
+    end
+end
+
+%--------------------------------------------------------------------------
+%
+%
+%
+%--------------------------------------------------------------------------
+function [ counts ] = getHistCounts( chorusElements, edges )
+    chorusAngles = [chorusElements.chorusAngle];
+    sweeprates = [chorusElements.sweeprate];
+    
+    angleCounts = histcounts(chorusAngles, edges.chorusAngles);
+    sweeprateCounts = histcounts(sweeprates / 1000, edges.sweeprates);
+
+    counts = struct('chorusAngles', angleCounts, 'sweeprates', sweeprateCounts);
+end
+
+%--------------------------------------------------------------------------
+%
+%
+%
+%--------------------------------------------------------------------------
+function sourceFiles = getSourceFiles( ppFilename, fceFilename, timestamp)
+    date = datestr(timestamp, 'yyyy MM DD');
+    year = date(1:4);
+    month = date(6:7);
+    day = date(9:10);
+    
+    filelist = dir(sprintf('/var/EMFISIS-SOC/OUT/RBSP-A/L2/%s/%s/%s', year, month, day));
+    sourceFiles{1,1} = ppFilename;
+    sourceFiles{2,1} = fceFilename;
+    
+    for i = 1:numel(filelist)
+        if contains(filelist(i).name, sprintf('%s%s%s', year, month, day)) ...
+                && contains(filelist(i).name, 'waveform-continuous-burst')
+            sourceFiles{3,1} = filelist(i).name;
+            return
+        end
+    end
+end
+
+%--------------------------------------------------------------------------
+%
+%
+%
+%--------------------------------------------------------------------------
+function [ cdfData, numRecords ] = updateCdfRecords( cdfData, chorusElements, timestamp, tspec, fspec, burstIndex, numRecords )
+    
+    % convert timestamp to datevec for tt2000 format conversion
+    for i = 1:numel(chorusElements)
+       numRecords = numRecords + 1;
+       % convert time of first point to tt2000 format
+       startTime = chorusElements(i).startInd;
+       startTime = tspec(startTime(1));
+       epoch = timestamp + seconds(startTime);
+       epoch = datevec(epoch);
+       cdfData.chorusEpoch(numRecords) = spdfdatenumtott2000(datenum(epoch)); %#ok<*SAGROW>
+       
+       
+       % add frequency values
+       freq = chorusElements(i).freq;
+       freq = fspec(freq);
+       cdfData.frequency(numRecords, 1:numel(freq)) = freq;
+       
+       % add psd values
+       psd = chorusElements(i).psd;
+       cdfData.psd(numRecords, 1:numel(psd)) = psd;
+       
+       % add sweeprate
+       cdfData.sweeprate(numRecords) = chorusElements(i).sweeprate;
+       
+       % add burst index
+       cdfData.burst(numRecords) = burstIndex;
+       
+       % add chorus index
+       cdfData.chorusIndex(numRecords) = i;       
+    end
+end
+
+%--------------------------------------------------------------------------
+%
+%
+%
+%--------------------------------------------------------------------------
+function writeToCdf( cdfFolder, version, date, cdfDataMaster, cdfInfoMaster, data, numRecords, deltaT, sourceFiles )
+  filename = sprintf('%s/rbsp-a_chorus-elements_%04d%02d%02d_%s', cdfFolder, date.Year, date.Month, date.Day, version);
+
+  % initialize static variables
+  timeOffset = 0:deltaT:(98*deltaT);
+  timeOffsetLabel = cdfDataMaster{3};
+
+  varlist{2 * length(cdfInfoMaster.Variables(:,1))} = {};
+  datatypes{2 * length(cdfInfoMaster.Variables(:,1))} = {};
+  % construct variable list, cell array for cdf file
+  for i = 1:length(cdfInfoMaster.Variables(:,1))
+    varlist{2 * i - 1} = cdfInfoMaster.Variables{i,1};
+    datatypes{2 * i - 1} = cdfInfoMaster.Variables{i, 1};
+    datatypes{2 * i} = cdfInfoMaster.Variables{i, 4};
+  end
+
+  varlist{2} = data.chorusEpoch(1:numRecords);
+  varlist{4} = timeOffset;
+  varlist{6} = timeOffsetLabel;
+  varlist{8} = data.frequency(1:numRecords, :);
+  varlist{10} = data.psd(1:numRecords, :);
+  varlist{12} = data.sweeprate(1:numRecords);
+  varlist{14} = data.burst(1:numRecords);
+  varlist{16} = data.chorusIndex(1:numRecords);
+
+  % construct recordbound variable list
+  rbvars = {cdfInfoMaster.Variables{:,1}};
+  for i = length(cdfInfoMaster.Variables(:,1)):-1:1
+     if (strncmpi(cdfInfoMaster.Variables{i,5}, 'f', 1) == 1)
+         rbvars(:,i) = [];
+     end
+  end
+  
+  ga = cdfInfoMaster.GlobalAttributes;
+  ga.FFT_size = {'1024'};
+  d1 = datestr(datetime('now'), 'ddd mmm dd HH:MM:SS');
+  d2 = datestr(datetime('now'), 'yyyy');
+  created = sprintf('%s CDT %s', d1, d2);
+  ga.Generation_date = {created};
+  ga.Source_file_list = sourceFiles;
+
+  spdfcdfwrite(filename, varlist, ...
+          'GlobalAttributes', cdfInfoMaster.GlobalAttributes, ...
+          'VariableAttributes', cdfInfoMaster.VariableAttributes, ...
+          'RecordBound', rbvars, ...
+          'Vardatatypes', datatypes, ...
+          'CDFLeapSecondLastUpdated', cdfInfoMaster.FileSettings.LeapSecondLastUpdated);
 end
