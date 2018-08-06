@@ -12,5 +12,7 @@ function [ snrMap, features ] = mapSnr( spect, fullSpect, snrThreshold )
 
     % threshold SNR
     features = spect;
-    features(snrMap < snrThreshold) = NaN;
+    features(snrMap < snrThreshold) = min(spect(:));
+    
+    snrMap(snrMap < 0) = NaN;
 end
