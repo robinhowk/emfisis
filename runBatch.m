@@ -11,7 +11,7 @@ addpath('matlab_cdf364_patch-64');
   % get start date, stop date, snrThreshold and source files from user
   [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
     fceTimes, fceLower, fceUpper, fceFilename, ...
-    cdfDataMaster, cdfInfoMaster] = getUserInput
+    cdfDataMaster, cdfInfoMaster] = getUserInput;
   
 
     % set up parameters
