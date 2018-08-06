@@ -1,4 +1,4 @@
-function [ skeleton, segmentLabels, spineLabels, spine ] = findSpines( ridges )
+function [ skeleton, segmentLabels, spineLabels, numSpines, spines ] = findSpines( ridges )
 %UNTITLED Summary of this function goes here
 %   Detailed explanation goes here
     
@@ -11,9 +11,10 @@ function [ skeleton, segmentLabels, spineLabels, spine ] = findSpines( ridges )
   % classify each branch point
   bpointInfo = classifyBpoints( segmentLabels, bpoints, epoints );
 
-  spineLabels = identifySpines( skeleton, segmentLabels, numSegments, bpoints, bpointInfo );
-  spine = zeros(size(spineLabels));
-  spine(spineLabels > 0) = 1;
+  [spineLabels, numSpines] = identifySpines( skeleton, segmentLabels, numSegments, bpoints, bpointInfo );
+  
+  spines = zeros(size(spineLabels));
+  spines(spineLabels > 0) = 1;
 end
 
 
@@ -321,7 +322,7 @@ end
 % Output:
 % Identify spines from the skeleton image. 
 %--------------------------------------------------------------------------
-function newSpines = identifySpines( skeleton, segmentLabels, numSegments, bpoints, bpointInfo )
+function [newSpines, numNewSpines] = identifySpines( skeleton, segmentLabels, numSegments, bpoints, bpointInfo )
   % get location of branch points
   [fb, tb] = find(bpoints == 1);
 
