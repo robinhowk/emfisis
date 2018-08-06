@@ -14,7 +14,7 @@ addpath('matlab_cdf364_patch-64');
     fceTimes, fceLower, fceUpper, fceFilename, ...
     cdfDataMaster, cdfInfoMaster] = getUserInput;
   
-  version = '2.1.1';
+  version = 'v2.1.1';
   
   % load parameters
   paramfilename = setparam;
@@ -136,22 +136,25 @@ addpath('matlab_cdf364_patch-64');
             totalRecordsDay = totalRecordsDay + numSpines;
 
             showBurstFigure( tspec, fspec, spect, ridges, timestamp, spines, spinesSnr, spinesFinal, chorusElements, numSpines, histEdges.sweeprates, figname, fLow, fHigh )
-          end
+          
                         
-          % save mat file
-          save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
-            'snrMap', 'features', 'skeleton', 'segmentLabels', ...
-            'spineLabels', 'numSpines', 'spines', 'spinesInfo', ...
-            'paramfilename', 'timestamp');
-        else
-          % save mat file
-            save(resultFilename, 'imagefile', 'spect', 'fspec', ...
-              'tspec', 'features', 'paramfilename', 'timestamp');
+            % save mat file
+            save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
+              'snrMap', 'features', 'skeleton', 'segmentLabels', ...
+              'spineLabels', 'numSpines', 'spines', 'spinesInfo', ...
+              'paramfilename', 'timestamp');
+          else
+            % save mat file
+              save(resultFilename, 'imagefile', 'spect', 'fspec', ...
+                'tspec', 'snrMap', 'features', 'skeleton', 'segmentLabels', ...
+                'spineLabels', 'numSpines', 'spines', ...
+                'paramfilename', 'timestamp');
+          end
         end % end of burst
       else
         % no ridges, save mat file
         save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
-          'paramfilename', 'timestamp');
+          'snrMap', 'features', 'paramfilename', 'timestamp');
       end
       close all;
     end % end of bursts loop
