@@ -29,7 +29,8 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ...
   ylabel(h1, 'Frequency (Hz)');
   title(c, 'SNR');
   set(h2, 'ydir', 'normal');
-
+  shading flat;
+  
   % features
   h3 = subplot(4,2,3);
   features(features == min(spect(:))) = NaN;
@@ -43,7 +44,8 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ...
   title(c, '10*log10(psd)');
   set(h3, 'YDir', 'normal');
   caxis([-160, -30]);
-
+  shading flat;
+  
   % spine segments
   h4 = subplot(4,2,4);
   imagesc(tspec, fspec, segmentLabels);
@@ -88,16 +90,15 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ...
   colorbar;
   caxis([-160, -30]);
   title(c, '10*log10(psd)');
-  title(h7, '(7) Spines with 1st Degree Line of Best Fit');
+  title(h7, '(7) Spectrogram with 1st Degree Line of Best Fit');
   xlabel(h7, 'Duration of event in seconds');
   ylabel(h7, 'Frequency (Hz)');
   set(h7, 'ydir', 'normal');
   hold on;
-  plot(tspec(t), fspec(f), 'k*', 'markersize', 2);
   for i = 1:chorusCount
     tvec = chorusElements(i).startInd:chorusElements(i).stopInd;
     fvec = chorusElements(i).fp1;
-    plot(tvec, fvec, 'k', 'linewidth', 1);
+    plot(tspec(tvec), fspec(fvec), 'k*', 'markersize', 2);
   end
   hold off;
 
@@ -109,16 +110,15 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ...
   colorbar;
   caxis([-160, -30]);
   title(c, '10*log10(psd)');
-  title(h8, '(8) Spines with 3rd Degree Line of Best Fit');
+  title(h8, '(8) Spectrogram with 3rd Degree Line of Best Fit');
   xlabel(h8, 'Duration of event in seconds');
   ylabel(h8, 'Frequency (Hz)');
   set(h8, 'ydir', 'normal');
   hold on;
-  plot(tspec(t), fspec(f), 'k*', 'markersize', 2);
   for i = 1:chorusCount
     tvec = chorusElements(i).startInd:chorusElements(i).stopInd;
     fvec = chorusElements(i).freq;
-    plot(tvec, fvec, 'k', 'linewidth', 1);
+    plot(tspec(tvec), fspec(fvec), 'k*', 'markersize', 2);
   end
   hold off;
     

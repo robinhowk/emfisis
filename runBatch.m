@@ -92,35 +92,39 @@ addpath('matlab_cdf364_patch-64');
         resultFilename = sprintf('%s/%s_%s.mat', resultsFolder, strtok(filename, '.'), version);
         
         % create spectrogram
-        [spect, fspec, isValid] = trimSpectrogram(timestamp, imagefile, ...
+        [spect, fspec, fLow, fHigh, isValid] = trimSpectrogram(timestamp, imagefile, ...
           tspec, fspec, fceTimes, fceLower, fceUpper);
         
         % create snr map of burst and select features about a given 
         % threshold
-        [ snrMap, features ] = mapSnr( spect, imagefile, snrThreshold );
+        [ snrMap, features ] = mapSnr( spect, 10*log10(imagefile), snrThreshold );
                 
         % if features are found continue
         if ~isnan(sum(features(:))) && isValid
           % find spine of detected features
           [skeleton, segmentLabels, spineLabels, numSpines, spines] = findSpines(features);
-                    
+                 
           if numSpines > 0
             % get information about each spine
-            chorusElements = getSpinesInfo(spineLabels, numSpines, spect, mu1);
+            [chorusElements, numChorus] = getSpinesInfo(spineLabels, numSpines, spect, mu1);
+          else
+            numChorus = 0;
+          end
           
+          if numChorus > 0
             % create figure
             showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ...
               features, segmentLabels, spineLabels, spines, timestamp, ...
-              chorusElements, chorusCount, figname, fLow, fHigh );
+              chorusElements, numChorus, figname, fLow, fHigh );
           
-            if numRecords + numSpines > numel(cdfData.chorusEpoch)
+            if numRecords + numChorus > numel(cdfData.chorusEpoch)
               numEntries = 1000;
               % reallocate array sizes, add room for 1000
               % more entries
               cdfData.chorusEpoch = [cdfData.chorusEpoch; int64(zeros(numEntries, cdfInfoMaster.Variables{1,2}(1)))];
               cdfData.frequency =  [cdfData.frequency; cdfInfoMaster.VariableAttributes.FILLVAL{4,2} * ones(numEntries, cdfInfoMaster.Variables{4,2}(1))];
               cdfData.psd =  [cdfData.psd; cdfInfoMaster.VariableAttributes.FILLVAL{5,2} * ones(numEntries, cdfInfoMaster.Variables{5,2}(1))];
-              cdfData.sweeprates = [cdfData.sweeprates; cdfInfoMaster.VariableAttributes.FILLVAL{6,2} * ones(numEntries, cdfInfoMaster.Variables{6,2}(1))];
+              cdfData.sweeprate = [cdfData.sweeprate; single(cdfInfoMaster.VariableAttributes.FILLVAL{6,2}) * ones(numEntries, cdfInfoMaster.Variables{6,2}(1))];
               cdfData.burst = [cdfData.burst; int32(zeros(numEntries, cdfInfoMaster.Variables{7,2}(1)))];
             end
             
@@ -128,20 +132,17 @@ addpath('matlab_cdf364_patch-64');
             burstCounts = getHistCounts(chorusElements, histEdges);
             dayCounts.chorusAngles = dayCounts.chorusAngles + burstCounts.chorusAngles;
             dayCounts.sweeprates = dayCounts.sweeprates + burstCounts.sweeprates;
-            dayCounts.hourlyTotals(timestamp.Hour + 1) = dayCounts.hourlyTotals(timestamp.Hour + 1) + numSpines;
+            dayCounts.hourlyTotals(timestamp.Hour + 1) = dayCounts.hourlyTotals(timestamp.Hour + 1) + numChorus;
 
             [cdfData, numRecords] = updateCdfRecords(cdfData, chorusElements, timestamp, tspec, fspec, str2double(filename(13:15)), numRecords);
 
             % add to record count
-            totalRecordsDay = totalRecordsDay + numSpines;
-
-            showBurstFigure( tspec, fspec, spect, ridges, timestamp, spines, spinesSnr, spinesFinal, chorusElements, numSpines, histEdges.sweeprates, figname, fLow, fHigh )
-          
+            totalRecordsDay = totalRecordsDay + numChorus;  
                         
             % save mat file
             save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
               'snrMap', 'features', 'skeleton', 'segmentLabels', ...
-              'spineLabels', 'numSpines', 'spines', 'spinesInfo', ...
+              'spineLabels', 'numSpines', 'spines', 'chorusElements', ...
               'paramfilename', 'timestamp');
           else
             % save mat file
@@ -162,13 +163,13 @@ addpath('matlab_cdf364_patch-64');
     % save cdf file for day
     if totalRecordsDay > 0
       sourceFiles = getSourceFiles( ppFilename, fceFilename, timestamp);
-      writeToCdf( cdfFolder, version, date, cdfDataMaster, cdfInfoMaster, ...
+      writeToCdf( cdfFolder, version, iDate, cdfDataMaster, cdfInfoMaster, ...
         cdfData, numRecords, tspec(1), sourceFiles );
     end
         
     % create summary histograms for day
     daySummaryFigFile = sprintf('%s/%04d%02d%02d_a_%s_summary_%s.jpg', ...
-      figFolder, date.Year, date.Month, date.Day, paramstring, version);
+      figFolder, iDate.Year, iDate.Month, iDate.Day, paramstring, version);
     showSummaryPanel(countsDay, histEdges, daySummaryFigFile);
         
     % update batch totals
@@ -410,7 +411,7 @@ end
 % Output: none
 %--------------------------------------------------------------------------
 function showSummaryPanel( counts, edges, destinationFile )
-  summary = figure('visibility', 'off');
+  summary = figure('visible', 'off');
   % plot hourly totals
   h1 = subplot(3, 1, 1);
   bar(0:1:23, counts.hourlyTotals, 'histc');
@@ -474,7 +475,7 @@ end
 %
 %
 %--------------------------------------------------------------------------
-function [spect, fspec, isValid] = trimSpectrogram(timestamp, ...
+function [spect, fspec, fLow, fHigh, isValid] = trimSpectrogram(timestamp, ...
   imagefile, tspec, fspec, fceTimes, fceLower, fceUpper)
   
   % check a fceTime falls inside the burst
@@ -582,32 +583,33 @@ function [ cdfData, numRecords ] = updateCdfRecords( cdfData, chorusElements, ti
     
     % convert timestamp to datevec for tt2000 format conversion
     for i = 1:numel(chorusElements)
-       numRecords = numRecords + 1;
-       % convert time of first point to tt2000 format
-       startTime = chorusElements(i).startInd;
-       startTime = tspec(startTime(1));
-       epoch = timestamp + seconds(startTime);
-       epoch = datevec(epoch);
-       cdfData.chorusEpoch(numRecords) = spdfdatenumtott2000(datenum(epoch)); %#ok<*SAGROW>
-       
-       
-       % add frequency values
-       freq = chorusElements(i).freq;
-       freq = fspec(freq);
-       cdfData.frequency(numRecords, 1:numel(freq)) = freq;
-       
-       % add psd values
-       psd = chorusElements(i).psd;
-       cdfData.psd(numRecords, 1:numel(psd)) = psd;
-       
-       % add sweeprate
-       cdfData.sweeprate(numRecords) = chorusElements(i).sweeprate;
-       
-       % add burst index
-       cdfData.burst(numRecords) = burstIndex;
-       
-       % add chorus index
-       cdfData.chorusIndex(numRecords) = i;       
+      numRecords = numRecords + 1;
+      % convert time of first point to tt2000 format
+      startTime = chorusElements(i).startInd;
+      startTime = tspec(startTime);
+      epoch = timestamp + seconds(startTime);
+      epoch = datevec(epoch);
+      spdfdatenumtott2000(datenum(epoch))
+      cdfData.chorusEpoch(numRecords) = spdfdatenumtott2000(datenum(epoch)); %#ok<*SAGROW>
+
+
+      % add frequency values
+      freq = chorusElements(i).freq;
+      freq = fspec(freq);
+      cdfData.frequency(numRecords, 1:numel(freq)) = freq;
+
+      % add psd values
+      psd = chorusElements(i).psd;
+      cdfData.psd(numRecords, 1:numel(psd)) = psd;
+
+      % add sweeprate
+      cdfData.sweeprate(numRecords) = chorusElements(i).sweeprate;
+
+      % add burst index
+      cdfData.burst(numRecords) = burstIndex;
+
+      % add chorus index
+      cdfData.chorusIndex(numRecords) = i;       
     end
 end
 
