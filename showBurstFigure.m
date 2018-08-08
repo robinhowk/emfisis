@@ -1,6 +1,6 @@
 function showBurstFigure( tspec, fspec, spect, snrMap, ...
-  ridges, snrThreshold, spine, tracedElements, chorusElements, ...
-  chorusCount, edges, figname )
+  features, ridges, snrThreshold, spine, tracedElements, ...
+  chorusElements, chorusCount, edges, figname )
 
   summary = figure('visible', 'off');
   h1 = subplot(4,2,1);
@@ -23,11 +23,10 @@ function showBurstFigure( tspec, fspec, spect, snrMap, ...
   ylabel(h7, 'Frequency (Hz)');
   title(c, 'SNR');
   set(h7, 'ydir', 'normal');
-  caxis([0 13]);
-  
+ 
   h2 = subplot(4,2,3);
-  ridges(ridges == min(ridges(:))) = NaN;
-  pcolor(tspec, fspec, ridges);
+  features(features == min(features(:))) = NaN;
+  pcolor(tspec, fspec, features);
   shading(h2, 'flat');
   colormap(h2, jet);
   c = colorbar;
@@ -39,13 +38,12 @@ function showBurstFigure( tspec, fspec, spect, snrMap, ...
   caxis([-160 -30]);
     
   h3 = subplot(4,2,4);
-  spine(spine == min(spine(:))) = NaN;
-  spine = spine + min(spect(:));
-  pcolor(tspec, fspec, spine);
+  ridges(ridges == min(spect(:))) = NaN;
+  pcolor(tspec, fspec, ridges);
   shading(h3, 'flat');
   colormap(h3, jet);
   c = colorbar;
-  title(h3, '(4) Detected Spines');
+  title(h3, '(4) Ridge Features');
   xlabel(h3, 'Duration of event in seconds');
   ylabel(h3, 'Frequency (Hz)');
   title(c, '10*log10(psd)');
@@ -53,14 +51,17 @@ function showBurstFigure( tspec, fspec, spect, snrMap, ...
   caxis([-160 -30]);
     
   h4 = subplot(4,2,5);
-  imagesc(tspec, fspec, tracedElements);
+  spine = spine + min(spect(:));
+  spine(spine == min(spect(:))) = NaN;
+  pcolor(tspec, fspec, spine);
   shading(h4, 'flat');
-  colormap(h4, gray);
+  colormap(h4, jet);
   colorbar;
-  title(h4, '(5) Traces');
+  title(h4, '(5) Spines From Ridge Features');
   xlabel(h4, 'Duration of event in seconds');
   ylabel(h4, 'Frequency (Hz)');
   set(h4, 'YDir', 'normal');
+  caxis([-160, -30]);
     
   h5 = subplot(4,2,6);
   imagesc(tspec, fspec, tracedElements);

@@ -28,7 +28,7 @@ t1 = tic;
     return
   end
     
-  version = 'v1.1.1';
+  version = 'v1.2.1';
 %--------------------------------------------------------------------------
 % Set up data for processing this batch of files. 
 % Load data from source files
@@ -117,15 +117,22 @@ t1 = tic;
         % threshold
         [ snrMap, features ] = mapSnr( spect, 10*log10(imagefile), snrThreshold );
 
+        if isValid
+          % find ridge features
+          [ridges, bw_ridges] = find_ridges(paramfilename, datafilename, features);
+        else
+          ridges = zeros(size(snrMap));
+          bw_ridges = ridges;
+        end        
+        
         % if ridges are found, continue
-        if ~isnan(sum(features(:))) && isValid
-          [spine, bwSpine] = center_of_mass(features, 2, 2);
+        if sum(bw_ridges(:)) > 0
+          [spine, bwSpine] = center_of_mass(ridges - min(spect(:)), 2, 2);
           [ chorusElements, tracedElements, chorusCount ] = ...
             traceBurst( bwSpine, spine, imagefile, fspec, tspec, mu1, ...
-            features, errorLogId, filename);
-
+            ridges-min(spect(:)), errorLogId, filename);
           % create figure   
-          showBurstFigure(tspec, fspec, spect, snrMap, features, ...
+          showBurstFigure(tspec, fspec, spect, snrMap, features, ridges, ...
             snrThreshold, spine, tracedElements, chorusElements, ...
             chorusCount, histEdges.sweeprates, figname);
 
