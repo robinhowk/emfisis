@@ -1,7 +1,8 @@
 function s1 = setparam
 
 tol = 1e-3;
-r = 4;
+% r = 4;
+r = 10;
 tau = 0.20;
 theta_phi = 1.0;
 % peakspread_threshold = 0;
