@@ -102,7 +102,7 @@ addpath('matlab_cdf364_patch-64');
         % if features are found continue
         if ~isnan(sum(features(:))) && isValid
           % find spine of detected features
-          [skeleton, segmentLabels, spineLabels, numSpines, spines] = findSpines(features);
+          [skeleton, dist, grad, grad2, segmentLabels, spineLabels, numSpines, spines] = findSpines(features);
                  
           if numSpines > 0
             % get information about each spine
@@ -115,7 +115,8 @@ addpath('matlab_cdf364_patch-64');
             % create figure
             showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ...
               features, segmentLabels, spineLabels, spines, timestamp, ...
-              chorusElements, numChorus, figname, fLow, fHigh );
+              chorusElements, numChorus, figname, fLow, fHigh, skeleton, ...
+              dist, grad, grad2);
           
             if numRecords + numChorus > numel(cdfData.chorusEpoch)
               numEntries = 1000;
