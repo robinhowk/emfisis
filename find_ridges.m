@@ -14,10 +14,6 @@ thetavec = thetavec(1:len/2);
 ridges = minval*ones(numrows,numcols);
 bw_ridges = zeros(size(spect));
 
-radimage1 = radon(imagefilenew, thetavec);
-maxrad = max(max(abs(radimage1)));
-rho_peak = maxrad * rho_threshold;
-
 for index1 = 1:numrows
     for index2 = 1:numcols
         curval = imagefilenew(index1,index2);
@@ -34,7 +30,7 @@ for index1 = 1:numrows
         minThreshold = prctile(subimage(:), 30);
        
         if curval > minThreshold && ~isnan(curval)
-            [chorus_flag] = isbraid(radsubimage,theta_phi,thetavec,spread, rho_peak);
+            [chorus_flag] = isbraid(radsubimage,theta_phi,thetavec,spread);
             if chorus_flag
                 ridges(index1,index2) = (spect(index1,index2));
                 bw_ridges(index1,index2) = 1;

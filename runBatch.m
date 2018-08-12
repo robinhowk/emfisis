@@ -14,7 +14,7 @@ addpath('matlab_cdf364_patch-64');
     fceTimes, fceLower, fceUpper, fceFilename, ...
     cdfDataMaster, cdfInfoMaster] = getUserInput;
   
-  version = 'v2.1.1';
+  version = 'v2.2.1';
   
   % load parameters
   paramfilename = setparam;
@@ -116,10 +116,7 @@ addpath('matlab_cdf364_patch-64');
           
           if numChorus > 0
             % create figure
-            showBurstFigure( tspec, fspec, spect, ridges, ...
-              features, segmentLabels, spineLabels, spines, timestamp, ...
-              chorusElements, numChorus, figname, fLow, fHigh, skeleton, ...
-              dist, grad, grad2);
+            showBurstFigure( tspec, fspec, spect, ridges, features, segmentLabels, spineLabels, spines, timestamp, chorusElements, numChorus, figname, fLow, fHigh, skeleton, dist, grad, grad2);
           
             if numRecords + numChorus > numel(cdfData.chorusEpoch)
               numEntries = 1000;
@@ -145,13 +142,13 @@ addpath('matlab_cdf364_patch-64');
                         
             % save mat file
             save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
-              'snrMap', 'features', 'skeleton', 'segmentLabels', ...
+              'features', 'skeleton', 'segmentLabels', ...
               'spineLabels', 'numSpines', 'spines', 'chorusElements', ...
               'paramfilename', 'timestamp');
           else
             % save mat file
               save(resultFilename, 'imagefile', 'spect', 'fspec', ...
-                'tspec', 'snrMap', 'features', 'skeleton', 'segmentLabels', ...
+                'tspec', 'features', 'skeleton', 'segmentLabels', ...
                 'spineLabels', 'numSpines', 'spines', ...
                 'paramfilename', 'timestamp');
           end
@@ -159,7 +156,7 @@ addpath('matlab_cdf364_patch-64');
       else
         % no ridges, save mat file
         save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
-          'snrMap', 'features', 'paramfilename', 'timestamp');
+          'features', 'paramfilename', 'timestamp');
       end
       close all;
     end % end of bursts loop

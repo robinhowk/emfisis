@@ -1,4 +1,4 @@
-function [chorusflag] = isbraid(image_mat,peakfactor_threshold,thetavec,spread, rho_threshold)
+function [chorusflag] = isbraid(image_mat,peakfactor_threshold,thetavec,spread)
 %%This works because over a small subimage, where one dominant angle
 %%persists. Not so well over cases with many small peaks across the
 %%anglular span in the radon domain
@@ -16,10 +16,5 @@ anglepeaks = max(image_mat);
 
 sharpestangle = angles(peakfactors == max(peakfactors));
 if(~isnan(sharpestangle))
-    % check rho threshold
-    rad_slice = image_mat(:,angle_indices(peakfactors == max(peakfactors)));
-
-    if max(rad_slice) >= rho_threshold
-        chorusflag = 1;
-    end
+  chorusflag = 1;
 end
