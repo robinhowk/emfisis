@@ -97,12 +97,15 @@ addpath('matlab_cdf364_patch-64');
         
         % create snr map of burst and select features about a given 
         % threshold
-        [ snrMap, features ] = mapSnr( spect, 10*log10(imagefile), snrThreshold );
-                
+        minThreshold = prctile(spect(:), 85);
+        features = spect;
+        features(features < minThreshold) = min(spect(:));
+        [ridges, bw_ridges] = find_ridges(paramfilename, features);
+        
         % if features are found continue
-        if ~isnan(sum(features(:))) && isValid
+        if sum(bw_ridges(:)) > 0 && isValid
           % find spine of detected features
-          [skeleton, dist, grad, grad2, segmentLabels, spineLabels, numSpines, spines] = findSpines(features);
+          [skeleton, dist, grad, grad2, segmentLabels, spineLabels, numSpines, spines] = findSpines(ridges);
                  
           if numSpines > 0
             % get information about each spine
@@ -113,7 +116,7 @@ addpath('matlab_cdf364_patch-64');
           
           if numChorus > 0
             % create figure
-            showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ...
+            showBurstFigure( tspec, fspec, spect, ridges, ...
               features, segmentLabels, spineLabels, spines, timestamp, ...
               chorusElements, numChorus, figname, fLow, fHigh, skeleton, ...
               dist, grad, grad2);
