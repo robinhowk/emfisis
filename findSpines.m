@@ -27,9 +27,10 @@ end
 %--------------------------------------------------------------------------
 function [skeleton, dist, grad, grad2] = skeletonize( ridges )
   % create binary version of ridge features
+  ridges = ridges - min(ridges(:));
   bwRidges = ridges;
   bwRidges(bwRidges > min(ridges(:))) = 1;
-  bwRidges(bwRidges < 1) = 0;
+  bwRidges(bwRidges ~= 1) = 0;
   bwRidges = bwmorph(bwRidges, 'fill');
   
   % calculate distance transform
