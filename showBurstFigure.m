@@ -1,11 +1,10 @@
 function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   features, segmentLabels, spineLabels, spines, timestamp, ...
-  chorusElements, chorusCount, figname, fLow, fHigh, skeleton, dist, ...
-  dist2, imagefile)
+  chorusElements, chorusCount, figname, fLow, fHigh, skeleton, imagefile)
 
   % original spectrogram
   summary = figure('visible', 'off');
-  h1 = subplot(4,4,1);
+  h1 = subplot(3,4,1);
   imagesc(tspec, fspec, spect);
   colormap(h1, jet);
   c = colorbar;
@@ -21,7 +20,7 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   hold off;
 
   % snr map
-  h2 = subplot(4,4,2);
+  h2 = subplot(3,4,2);
   imagesc(tspec, fspec, snrMap);
   colormap(h2, jet);
   c = colorbar;
@@ -33,7 +32,7 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   
   
   % features
-  h3 = subplot(4,4,3);
+  h3 = subplot(3,4,3);
   features(features == min(spect(:))) = NaN;
   pcolor(tspec, fspec, features);
   colormap(h3, jet);
@@ -48,7 +47,7 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   shading flat;
   
   % ridges
-  h13 = subplot(4,4,4);
+  h13 = subplot(3,4,4);
   ridges(ridges == min(ridges(:))) = NaN;
   pcolor(tspec, fspec, ridges);
   colormap(h13, jet);
@@ -61,40 +60,8 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   caxis([-160, -30]);
   shading flat;
   
-  % distance transform
-  h9 = subplot(4,4,5);
-  pcolor(tspec, fspec, dist);
-  shading(h9, 'flat');
-  colormap(h9, jet);
-  c = colorbar;
-  title(h9, '(5), Distance Transform of Ridge Features');
-  xlabel(h9, 'Duration of event (in seconds)');
-  ylabel(h9, 'Frequency (Hz)');
-  set(h9, 'ydir', 'normal');
-  
-  % thresholded distance transform
-  h10 = subplot(4,4,6);
-  pcolor(tspec, fspec, dist2);
-  colormap(h10, jet);
-  shading(h10, 'flat');
-  c = colorbar;
-  title(h10, '(6) Distance Transform Threshold at 1.5');
-  xlabel(h10, 'Duration of event (in seconds)');
-  ylabel(h10, 'Frequency (Hz)');
-  set(h10, 'ydir', 'normal');
-  
-%   % gradient after threshold 
-%   h11 = subplot(4,4,7);
-%   imagesc(tspec, fspec, grad2);
-%   colormap(h11, gray);
-%   c = colorbar;
-%   title(h11, '(7) Gradient Threshold at 0.75');
-%   xlabel(h11, 'Duration of event (in seconds)');
-%   ylabel(h11, 'Frequency (Hz)');
-%   set(h11, 'ydir', 'normal');
-  
   % gradient after cleaning
-  h12 = subplot(4,4,7);
+  h12 = subplot(3,4,5);
   imagesc(tspec, fspec, skeleton);
   colormap(h12, gray);
   shading(h12, 'flat');
@@ -105,27 +72,33 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   set(h12, 'ydir', 'normal');
   
   % spine segments
-  h4 = subplot(4,4,8);
-  imagesc(tspec, fspec, segmentLabels);
-  colormap(h4, colorcube);
+  h4 = subplot(3,4,6);
+  segmentLabels(segmentLabels < 1) = NaN;
+  pcolor(tspec, fspec, segmentLabels);
+  cmap = colorcube;
+  cmap = cmap(1:10, :);
+  colormap(h4, cmap);
   c = colorbar;
+  shading(h4, 'flat');
   title(h4, '(9) Spine Segments');
   xlabel(h4, 'Duration of event in seconds');
   ylabel(h4, 'Frequency (Hz)');
   set(h4, 'YDir', 'normal');
 
   % spine labels
-  h5 = subplot(4,4,9);
-  imagesc(tspec, fspec, spineLabels);
-  colormap(h5, colorcube);
+  h5 = subplot(3,4,7);
+  spineLabels(spineLabels < 1) = NaN;
+  pcolor(tspec, fspec, spineLabels);
+  colormap(h5, cmap);
   colorbar;
+  shading(h5, 'flat');
   title(h5, '(10) Identified Spines');
   xlabel(h5, 'Duration of event in seconds');
   ylabel(h5, 'Frequency (Hz)');
   set(h5, 'YDir', 'normal');
 
   % spines with spectrogram
-  h6 = subplot(4,4,10);
+  h6 = subplot(3,4,8);
   imagesc(tspec, fspec, spect);
   colormap(h6, jet);
   colorbar;
@@ -142,7 +115,7 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
 
   % spectrogram with spnies and 1st degree LOBF, used for determining
   % sweeprate/chorus angle
-  h7 = subplot(4,4,11);
+  h7 = subplot(3,4,9);
   imagesc(tspec, fspec, spect);
   colormap(h7, jet);
   colorbar;
@@ -162,7 +135,7 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
 
   % spectrogram with spines and 3rd degree lobf, used for selecting
   % points save to the cdf
-  h8 = subplot(4,4,12);
+  h8 = subplot(3,4,10);
   imagesc(tspec, fspec, spect);
   colormap(h8, jet);
   colorbar;
@@ -180,7 +153,7 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   end
   hold off;
   
-  h14 = subplot(4,4,13);
+  h14 = subplot(3,4,11);
   imagesc(10*log10(imagefile));
   colormap(h14, jet);
   colorbar;
