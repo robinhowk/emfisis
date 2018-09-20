@@ -1,7 +1,7 @@
-function showBurstFigure( tspec, fspec, spect, ridges, ...
+function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   features, segmentLabels, spineLabels, spines, timestamp, ...
   chorusElements, chorusCount, figname, fLow, fHigh, skeleton, dist, ...
-  grad, grad2)
+  grad, grad2, imagefile)
 
   % original spectrogram
   summary = figure('visible', 'off');
@@ -22,10 +22,15 @@ function showBurstFigure( tspec, fspec, spect, ridges, ...
 
   % snr map
   h2 = subplot(4,4,2);
-  hist(spect(:));
-  title(h2, '(2) Distribution of PSD Values');
-  xlabel(h2, 'PSD Values');
-  ylabel(h2, 'Count');
+  imagesc(tspec, fspec, snrMap);
+  colormap(h2, jet);
+  c = colorbar;
+  title(h2, '(2) SNR Map');
+  xlabel(h2, 'Duration of event in seconds');
+  ylabel(h2, 'Frequency (Hz)');
+  title(c, 'SNR');
+  set(h2, 'ydir', 'normal');
+  
   
   % features
   h3 = subplot(4,4,3);
@@ -34,7 +39,7 @@ function showBurstFigure( tspec, fspec, spect, ridges, ...
   colormap(h3, jet);
   c = colorbar;
   title(c, '10*log10(psd)');
-  title(h3, '(3) Features Threshold At 85%');
+  title(h3, sprintf('(3) Features Threshold At \n%.01d', snrThreshold));
   xlabel(h3, 'Duration of event (in seconds)');
   ylabel(h3, 'Frequency (Hz)');
   title(c, '10*log10(psd)');
@@ -172,7 +177,16 @@ function showBurstFigure( tspec, fspec, spect, ridges, ...
     plot(tspec(tvec), fspec(fvec), 'k*', 'markersize', 2);
   end
   hold off;
-    
+  
+  h14 = subplot(4,4,14);
+  imagesc(10*log10(imagefile));
+  colormap(h14, jet);
+  colorbar;
+  title(h14, 'Full Spectrogram');
+  xlabel(h14, 'Time Index');
+  ylabel(h14, 'Frequency Index');
+  set(h14, 'ydir', 'normal');
+      
   % render image maximized to screen
   set(gcf, 'Position', get(0, 'Screensize'));
 

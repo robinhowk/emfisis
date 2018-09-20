@@ -7,14 +7,14 @@ addpath('matlab_cdf364_patch-64');
   % start time
   t1 = tic;
   %------------------------------------------------------------------------
-  % Set up
+  % Set u
   %------------------------------------------------------------------------
   % get start date, stop date, snrThreshold and source files from user
   [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
     fceTimes, fceLower, fceUpper, fceFilename, ...
     cdfDataMaster, cdfInfoMaster] = getUserInput;
   
-  version = 'v2.2.1';
+  version = 'v2.2.2';
   
   % load parameters
   paramfilename = setparam;
@@ -78,6 +78,7 @@ addpath('matlab_cdf364_patch-64');
       tspec = data.tspec;
       imagefile = data.imagefile;
       timestamp = data.timestamp
+      BuData = data.BuData;
             
       %--------------------------------------------------------------------
       % check if current burst falls within a valid plasmapause interval. 
@@ -94,16 +95,18 @@ addpath('matlab_cdf364_patch-64');
         % create spectrogram
         [spect, fspec, fLow, fHigh, isValid] = trimSpectrogram(timestamp, imagefile, ...
           tspec, fspec, fceTimes, fceLower, fceUpper);
-        
-        % create snr map of burst and select features about a given 
-        % threshold
-        minThreshold = prctile(spect(:), 85);
-        features = spect;
-        features(features < minThreshold) = min(spect(:));
-        [ridges, bw_ridges] = find_ridges(paramfilename, features);
+
+        if isValid
+          % create snr map of burst and select features about a given 
+          % threshold
+          [snrMap, features] = mapSnr(spect, 10*log10(imagefile), snrThreshold);
+          [ridges, bw_ridges] = find_ridges(paramfilename, features);
+        else
+          bw_ridges = zeros(size(spect));
+        end
         
         % if features are found continue
-        if sum(bw_ridges(:)) > 0 && isValid
+        if sum(bw_ridges(:)) > 0
           % find spine of detected features
           [skeleton, dist, grad, grad2, segmentLabels, spineLabels, numSpines, spines] = findSpines(ridges);
                  
@@ -116,7 +119,10 @@ addpath('matlab_cdf364_patch-64');
           
           if numChorus > 0
             % create figure
-            showBurstFigure( tspec, fspec, spect, ridges, features, segmentLabels, spineLabels, spines, timestamp, chorusElements, numChorus, figname, fLow, fHigh, skeleton, dist, grad, grad2);
+            showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ...
+              ridges, features, segmentLabels, spineLabels, ...
+              spines, timestamp, chorusElements, numChorus, ...
+              figname, fLow, fHigh, skeleton, dist, grad, grad2, imagefile);
           
             if numRecords + numChorus > numel(cdfData.chorusEpoch)
               numEntries = 1000;
@@ -144,19 +150,19 @@ addpath('matlab_cdf364_patch-64');
             save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
               'features', 'skeleton', 'segmentLabels', ...
               'spineLabels', 'numSpines', 'spines', 'chorusElements', ...
-              'paramfilename', 'timestamp');
+              'paramfilename', 'timestamp', 'BuData');
           else
             % save mat file
               save(resultFilename, 'imagefile', 'spect', 'fspec', ...
                 'tspec', 'features', 'skeleton', 'segmentLabels', ...
                 'spineLabels', 'numSpines', 'spines', ...
-                'paramfilename', 'timestamp');
+                'paramfilename', 'timestamp', 'BuData');
           end
         end % end of burst
       else
         % no ridges, save mat file
         save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
-          'features', 'paramfilename', 'timestamp');
+          'features', 'paramfilename', 'timestamp', 'BuData');
       end
       close all;
     end % end of bursts loop
@@ -346,7 +352,6 @@ function [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
     end
     fceLower = str2double(fceLower);
     fceUpper = str2double(fceUpper);
-
     % trim to start and stop dates, include data on either side for
     % interpolation
     interval = find(fceTimes >= startDate & fceTimes < (stopDate + 1));
@@ -497,7 +502,13 @@ function [spect, fspec, fLow, fHigh, isValid] = trimSpectrogram(timestamp, ...
   if ~isnan(fLow)
     low = find(fspec > fLow, 1, 'first');
     low = low - 1;
-    high = find(fspec > fHigh, 1, 'first');
+    high = find(fspec > fHigh, 1, 'first')
+    if isempty(high) || high > 199
+      isValid = false;
+      fLow = fspec(1);
+      fHigh = fspec(end);
+      return;
+    end
     low = min(max(1, low), numel(fspec));
     high = max(min(numel(fspec), high), 1);
     if low ~= high
@@ -526,7 +537,7 @@ function [spect, fspec, fLow, fHigh, isValid] = trimSpectrogram(timestamp, ...
         prevTime = datenum(prevTime);
         nextTime = datenum(nextTime);
         curTime = datenum(curTime);
-
+        
         % intermediate values used for calculation
         a = (nextFce - prevFce) / (nextTime - prevTime);
         b = curTime - prevTime;
