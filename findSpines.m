@@ -1,9 +1,9 @@
-function [ skeleton, dist, grad, grad2, segmentLabels, spineLabels, numSpines, spines ] = findSpines( ridges )
+function [ skeleton, dist, dist2, segmentLabels, spineLabels, numSpines, spines ] = findSpines( ridges )
 %UNTITLED Summary of this function goes here
 %   Detailed explanation goes here
     
   % find the skeleton of ridge features
-  [skeleton, dist, grad, grad2] = skeletonize(ridges);
+  [skeleton, dist, dist2] = skeletonize(ridges);
 
   % identify each segment of the skeleton
   [segmentLabels, numSegments, bpoints, epoints] = identifySegments(skeleton);
@@ -25,7 +25,7 @@ end
 % Extracts the domint ridges along the gradient, creating skeleton of ridge
 % features
 %--------------------------------------------------------------------------
-function [skeleton, dist, grad, grad2] = skeletonize( ridges )
+function [skeleton, dist, dist2] = skeletonize( ridges )
   % create binary version of ridge features
   ridges = ridges - min(ridges(:));
   bwRidges = ridges;
@@ -37,22 +37,31 @@ function [skeleton, dist, grad, grad2] = skeletonize( ridges )
   dist = bwdist(~bwRidges);
   dist(dist == 0) = NaN;
 
-  % calculate gradient of distance transform
-  grad = imgradient(dist);
-  maxgrad = max(grad(:));
-  grad = grad ./ maxgrad;
+%   % calculate gradient of distance transform
+%   grad = imgradient(dist);
+%   maxgrad = max(grad(:));
+%   grad = grad ./ maxgrad;
+%   
+%   % apply threshold to gradient to extract skeleton
+%   grad2 = grad;
+%   grad2(grad < .75) = 2;
+%   grad2(grad2 < 1) = 1;
+%   grad2 = grad2 -1;
+%   grad2(isnan(grad2)) = 0;
   
-  % apply threshold to gradient to extract skeleton
-  grad2 = grad;
-  grad2(grad < .75) = 2;
-  grad2(grad2 < 1) = 1;
-  grad2 = grad2 -1;
-  grad2(isnan(grad2)) = 0;
+  % threshold distance transform
+  dist2 = dist;
+  dist2(dist2 < 1.5) = NaN;
+    
+  % create binary image from distance transform 
+  bwDist = dist2;
+  bwDist(~isnan(bwDist)) = 1;
+  bwDist(isnan(bwDist)) = 0;
   
   % thin and clean skeleton
-  skeleton = bwmorph(grad2, 'thin', Inf);
+  skeleton = bwmorph(bwDist, 'thin', Inf);  
   skeleton = bwmorph(skeleton, 'clean');
-
+  
   % pad skeleton so edges can be reached for further cleaning
   skeleton = padarray(skeleton, [2 2], 0, 'both');
   

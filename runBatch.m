@@ -14,7 +14,7 @@ addpath('matlab_cdf364_patch-64');
     fceTimes, fceLower, fceUpper, fceFilename, ...
     cdfDataMaster, cdfInfoMaster] = getUserInput;
   
-  version = 'v2.2.2';
+  version = 'v2.2.3';
   
   % load parameters
   paramfilename = setparam;
@@ -108,7 +108,7 @@ addpath('matlab_cdf364_patch-64');
         % if features are found continue
         if sum(bw_ridges(:)) > 0
           % find spine of detected features
-          [skeleton, dist, grad, grad2, segmentLabels, spineLabels, numSpines, spines] = findSpines(ridges);
+          [skeleton, dist, dist2, segmentLabels, spineLabels, numSpines, spines] = findSpines(ridges);
                  
           if numSpines > 0
             % get information about each spine
@@ -122,7 +122,7 @@ addpath('matlab_cdf364_patch-64');
             showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ...
               ridges, features, segmentLabels, spineLabels, ...
               spines, timestamp, chorusElements, numChorus, ...
-              figname, fLow, fHigh, skeleton, dist, grad, grad2, imagefile);
+              figname, fLow, fHigh, skeleton, dist, dist2, imagefile);
           
             if numRecords + numChorus > numel(cdfData.chorusEpoch)
               numEntries = 1000;
