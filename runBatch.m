@@ -10,11 +10,11 @@ addpath('matlab_cdf364_patch-64');
   % Set u
   %------------------------------------------------------------------------
   % get start date, stop date, snrThreshold and source files from user
-  [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
+  [startDate, stopDate, snrPercentile, ppIntervals, ppFilename, ...
     fceTimes, fceLower, fceUpper, fceFilename, ...
     cdfDataMaster, cdfInfoMaster] = getUserInput;
   
-  version = 'v2.2.3';
+  version = 'v2.3.1';
   
   % load parameters
   paramfilename = setparam;
@@ -99,7 +99,7 @@ addpath('matlab_cdf364_patch-64');
         if isValid
           % create snr map of burst and select features about a given 
           % threshold
-          [snrMap, features] = mapSnr(spect, 10*log10(imagefile), snrThreshold);
+          [snrMap, snrThreshold, features] = mapSnr(spect, 10*log10(imagefile), snrPercentile);
           [ridges, bw_ridges] = find_ridges(paramfilename, features);
         else
           bw_ridges = zeros(size(spect));
@@ -222,7 +222,7 @@ function [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
   [startDate, stopDate] = getDates;
   
   % get snr threshold from user
-  snrThreshold = input('\nEnter SNR threshold to be used: ');
+  snrThreshold = input('\nEnter SNR percentile to be used: ');
   
   % confirm selections
   userConfirm =  input('\n Confirm entered values (y/n): ', 's');
@@ -502,7 +502,7 @@ function [spect, fspec, fLow, fHigh, isValid] = trimSpectrogram(timestamp, ...
   if ~isnan(fLow)
     low = find(fspec > fLow, 1, 'first');
     low = low - 1;
-    high = find(fspec > fHigh, 1, 'first')
+    high = find(fspec > fHigh, 1, 'first');
     if isempty(high) || high > 199
       isValid = false;
       fLow = fspec(1);

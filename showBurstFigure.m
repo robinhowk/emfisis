@@ -31,15 +31,20 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   title(c, 'SNR');
   set(h2, 'ydir', 'normal');
   
+  % snr histogram
+  h15 = subplot(4,4,3);
+  hist(snrMap(:));
+  title(h15, '(3) Histogram of SNR Values');
+  xlabel(h15, 'SNR');
   
   % features
-  h3 = subplot(4,4,3);
+  h3 = subplot(4,4,4);
   features(features == min(spect(:))) = NaN;
   pcolor(tspec, fspec, features);
   colormap(h3, jet);
   c = colorbar;
   title(c, '10*log10(psd)');
-  title(h3, sprintf('(3) Features Threshold At \n%.01d', snrThreshold));
+  title(h3, sprintf('(4) Features wiht SNR > \n%.01d', snrThreshold));
   xlabel(h3, 'Duration of event (in seconds)');
   ylabel(h3, 'Frequency (Hz)');
   title(c, '10*log10(psd)');
@@ -48,13 +53,13 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   shading flat;
   
   % ridges
-  h13 = subplot(4,4,4);
+  h13 = subplot(4,4,5);
   ridges(ridges == min(ridges(:))) = NaN;
   pcolor(tspec, fspec, ridges);
   colormap(h13, jet);
   c = colorbar;
   title(c, '10*log10(psd)');
-  title(h13, '(4) Ridge Features');
+  title(h13, '(5) Ridge Features');
   xlabel(h13, 'Duration of event (in seconds)');
   ylabel(h13, 'Frequency (Hz)');
   set(h13, 'ydir','normal');
@@ -62,23 +67,23 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   shading flat;
   
   % distance transform
-  h9 = subplot(4,4,5);
+  h9 = subplot(4,4,6);
   pcolor(tspec, fspec, dist);
   shading(h9, 'flat');
   colormap(h9, jet);
   c = colorbar;
-  title(h9, '(5), Distance Transform of Ridge Features');
+  title(h9, '(6), Distance Transform of Ridge Features');
   xlabel(h9, 'Duration of event (in seconds)');
   ylabel(h9, 'Frequency (Hz)');
   set(h9, 'ydir', 'normal');
   
   % thresholded distance transform
-  h10 = subplot(4,4,6);
+  h10 = subplot(4,4,7);
   pcolor(tspec, fspec, dist2);
   colormap(h10, jet);
   shading(h10, 'flat');
   c = colorbar;
-  title(h10, '(6) Distance Transform Threshold at 1.5');
+  title(h10, '(7) Distance Transform Threshold at 1.5');
   xlabel(h10, 'Duration of event (in seconds)');
   ylabel(h10, 'Frequency (Hz)');
   set(h10, 'ydir', 'normal');
@@ -94,7 +99,7 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
 %   set(h11, 'ydir', 'normal');
   
   % gradient after cleaning
-  h12 = subplot(4,4,7);
+  h12 = subplot(4,4,8);
   imagesc(tspec, fspec, skeleton);
   colormap(h12, gray);
   shading(h12, 'flat');
@@ -105,7 +110,7 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   set(h12, 'ydir', 'normal');
   
   % spine segments
-  h4 = subplot(4,4,8);
+  h4 = subplot(4,4,9);
   imagesc(tspec, fspec, segmentLabels);
   colormap(h4, colorcube);
   c = colorbar;
@@ -115,7 +120,7 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   set(h4, 'YDir', 'normal');
 
   % spine labels
-  h5 = subplot(4,4,9);
+  h5 = subplot(4,4,10);
   imagesc(tspec, fspec, spineLabels);
   colormap(h5, colorcube);
   colorbar;
@@ -125,7 +130,7 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   set(h5, 'YDir', 'normal');
 
   % spines with spectrogram
-  h6 = subplot(4,4,10);
+  h6 = subplot(4,4,11);
   imagesc(tspec, fspec, spect);
   colormap(h6, jet);
   colorbar;
@@ -142,7 +147,7 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
 
   % spectrogram with spnies and 1st degree LOBF, used for determining
   % sweeprate/chorus angle
-  h7 = subplot(4,4,11);
+  h7 = subplot(4,4,12);
   imagesc(tspec, fspec, spect);
   colormap(h7, jet);
   colorbar;
@@ -162,7 +167,7 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
 
   % spectrogram with spines and 3rd degree lobf, used for selecting
   % points save to the cdf
-  h8 = subplot(4,4,12);
+  h8 = subplot(4,4,13);
   imagesc(tspec, fspec, spect);
   colormap(h8, jet);
   colorbar;
@@ -180,11 +185,11 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   end
   hold off;
   
-  h14 = subplot(4,4,13);
+  h14 = subplot(4,4,14);
   imagesc(10*log10(imagefile));
   colormap(h14, jet);
   colorbar;
-  title(h14, 'Full Spectrogram');
+  title(h14, '(14) Full Spectrogram For Reference');
   xlabel(h14, 'Time Index');
   ylabel(h14, 'Frequency Index');
   set(h14, 'ydir', 'normal');
