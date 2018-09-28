@@ -293,7 +293,10 @@ function bpointInfo = classifyBpoints( segmentLabels, bpoints, epoints )
   bpointInfo = zeros(3, 2, numBpoints);
 
   % create bpointInfo matrix
+  size(fb)
+  size(tb)
   for i = 1:numBpoints
+    i
     labels = segmentLabels(fb(i) - 1:fb(i) + 1, tb(i) - 1:tb(i) + 1);
     labels = unique(labels(labels > 0))';
     hasEpoint = ismember(labels, epointLabels);
@@ -539,7 +542,9 @@ function [newSpines, numNewSpines] = identifySpines( skeleton, segmentLabels, nu
     visitedBpoints(i) = true;
       
     % find each combination of branches
-    combos = combnk(adjSegments, 2);
+    if ~isempty(adjSegments)
+      combos = combnk(adjSegments, 2);
+    end
       
     % preallocate for each combination
     segments = zeros(size(segmentLabels,1), ...

@@ -1,4 +1,4 @@
-function [ snrMap, features ] = mapSnr( spect, fullSpect, snrThreshold )
+function [ snrMap, snrThreshold, features ] = mapSnr( spect, fullSpect, snrPercentile )
 %Finds the SNR for each pixel based on an extracted noise sample.
 
     % get size of spectrogram
@@ -12,6 +12,7 @@ function [ snrMap, features ] = mapSnr( spect, fullSpect, snrThreshold )
     snrMap = 10*log10(snrMap);
 
     % threshold SNR
+    snrThreshold = prctile(snrMap(:), snrPercentile);
     features = spect;
     features(snrMap < snrThreshold) = min(spect(:));
     

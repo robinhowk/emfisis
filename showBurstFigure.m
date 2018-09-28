@@ -30,15 +30,20 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   title(c, 'SNR');
   set(h2, 'ydir', 'normal');
   
+  % snr histogram
+  h15 = subplot(3,4,3);
+  histogram(snrMap(:));
+  title(h15, '(3) Distribution of SNR Values');
+  xlabel('SNR Values');
   
   % features
-  h3 = subplot(3,4,3);
+  h3 = subplot(3,4,4);
   features(features == min(spect(:))) = NaN;
   pcolor(tspec, fspec, features);
   colormap(h3, jet);
   c = colorbar;
   title(c, '10*log10(psd)');
-  title(h3, sprintf('(3) Features Threshold At \n%.01d', snrThreshold));
+  title(h3, sprintf('(4) Features Threshold At \n%.01d', snrThreshold));
   xlabel(h3, 'Duration of event (in seconds)');
   ylabel(h3, 'Frequency (Hz)');
   title(c, '10*log10(psd)');
@@ -47,21 +52,21 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   shading flat;
   
   % ridges
-  h13 = subplot(3,4,4);
+  h13 = subplot(3,4,5);
   ridges(ridges == min(ridges(:))) = NaN;
   pcolor(tspec, fspec, ridges);
   colormap(h13, jet);
   c = colorbar;
   title(c, '10*log10(psd)');
-  title(h13, '(4) Ridge Features');
+  title(h13, '(5) Ridge Features');
   xlabel(h13, 'Duration of event (in seconds)');
   ylabel(h13, 'Frequency (Hz)');
   set(h13, 'ydir','normal');
   caxis([-160, -30]);
   shading flat;
   
-  % gradient after cleaning
-  h12 = subplot(3,4,5);
+  % skeleton
+  h12 = subplot(3,4,6);
   imagesc(tspec, fspec, skeleton);
   colormap(h12, gray);
   shading(h12, 'flat');
@@ -72,7 +77,7 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   set(h12, 'ydir', 'normal');
   
   % spine segments
-  h4 = subplot(3,4,6);
+  h4 = subplot(3,4,7);
   segmentLabels(segmentLabels < 1) = NaN;
   pcolor(tspec, fspec, segmentLabels);
   cmap = colorcube;
@@ -80,48 +85,50 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   colormap(h4, cmap);
   c = colorbar;
   shading(h4, 'flat');
-  title(h4, '(9) Spine Segments');
+  title(h4, '(7) Spine Segments');
   xlabel(h4, 'Duration of event in seconds');
   ylabel(h4, 'Frequency (Hz)');
   set(h4, 'YDir', 'normal');
 
   % spine labels
-  h5 = subplot(3,4,7);
-  spineLabels(spineLabels < 1) = NaN;
+  h5 = subplot(3,4,8);
+  spineLabels(spineLabels == 54) = NaN;
   pcolor(tspec, fspec, spineLabels);
   colormap(h5, cmap);
   colorbar;
   shading(h5, 'flat');
-  title(h5, '(10) Identified Spines');
+  title(h5, '(8) Identified Spines');
   xlabel(h5, 'Duration of event in seconds');
   ylabel(h5, 'Frequency (Hz)');
   set(h5, 'YDir', 'normal');
 
   % spines with spectrogram
-  h6 = subplot(3,4,8);
+  h6 = subplot(3,4,9);
   imagesc(tspec, fspec, spect);
   colormap(h6, jet);
   colorbar;
   caxis([-160, -30]);
+  shading flat;
   title(c, '10*log10(psd)');
-  title(h6, '(11) Spectrogram with Identified Spines');
+  title(h6, '(9) Spectrogram with Identified Spines');
   xlabel(h6, 'Duration of event in seconds');
   ylabel(h6, 'Frequency (Hz)');
   set(h6, 'YDir', 'normal');
   hold on;
-  [f, t] = find(spines == 1);
+  [f, t] = find(~isnan(spineLabels));
   plot(tspec(t), fspec(f), 'k*', 'markersize', 2);
   hold off;
 
   % spectrogram with spnies and 1st degree LOBF, used for determining
   % sweeprate/chorus angle
-  h7 = subplot(3,4,9);
+  h7 = subplot(3,4,10);
   imagesc(tspec, fspec, spect);
   colormap(h7, jet);
   colorbar;
   caxis([-160, -30]);
   title(c, '10*log10(psd)');
-  title(h7, '(12) Spectrogram with 1st Degree Line of Best Fit');
+  str = sprintf('(10) Spectrogram with 1st Degree\nLine of Best Fit');
+  title(h7, str);
   xlabel(h7, 'Duration of event in seconds');
   ylabel(h7, 'Frequency (Hz)');
   set(h7, 'ydir', 'normal');
@@ -135,13 +142,13 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
 
   % spectrogram with spines and 3rd degree lobf, used for selecting
   % points save to the cdf
-  h8 = subplot(3,4,10);
+  h8 = subplot(3,4,11);
   imagesc(tspec, fspec, spect);
   colormap(h8, jet);
   colorbar;
   caxis([-160, -30]);
   title(c, '10*log10(psd)');
-  title(h8, '(13) Spectrogram with 3rd Degree Line of Best Fit');
+  title(h8, '(11) Spectrogram with 3rd Degree Line of Best Fit');
   xlabel(h8, 'Duration of event in seconds');
   ylabel(h8, 'Frequency (Hz)');
   set(h8, 'ydir', 'normal');
@@ -153,11 +160,11 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   end
   hold off;
   
-  h14 = subplot(3,4,11);
+  h14 = subplot(3,4,12);
   imagesc(10*log10(imagefile));
   colormap(h14, jet);
   colorbar;
-  title(h14, 'Full Spectrogram');
+  title(h14, '(12) Full Spectrogram For Reference');
   xlabel(h14, 'Time Index');
   ylabel(h14, 'Frequency Index');
   set(h14, 'ydir', 'normal');

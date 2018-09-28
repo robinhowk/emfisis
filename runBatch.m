@@ -10,11 +10,11 @@ addpath('matlab_cdf364_patch-64');
   % Set u
   %------------------------------------------------------------------------
   % get start date, stop date, snrThreshold and source files from user
-  [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
+  [startDate, stopDate, snrPercentile, ppIntervals, ppFilename, ...
     fceTimes, fceLower, fceUpper, fceFilename, ...
     cdfDataMaster, cdfInfoMaster] = getUserInput;
   
-  version = 'v2.2.4';
+  version = 'v2.3.2';
   
   % load parameters
   paramfilename = setparam;
@@ -99,7 +99,7 @@ addpath('matlab_cdf364_patch-64');
         if isValid
           % create snr map of burst and select features about a given 
           % threshold
-          [snrMap, features] = mapSnr(spect, 10*log10(imagefile), snrThreshold);
+          [snrMap, snrThreshold, features] = mapSnr(spect, 10*log10(imagefile), snrPercentile);
           [ridges, bw_ridges] = find_ridges(paramfilename, features);
         else
           bw_ridges = zeros(size(spect));
@@ -214,7 +214,7 @@ end
 %           template
 %         ppFilename, fceFilename - path to these files
 %--------------------------------------------------------------------------
-function [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
+function [startDate, stopDate, snrPercentile, ppIntervals, ppFilename, ...
   fceTimes, fceLower, fceUpper, fceFilename, ...
   cdfDataMaster, cdfInfoMaster] = getUserInput
   
@@ -222,12 +222,12 @@ function [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
   [startDate, stopDate] = getDates;
   
   % get snr threshold from user
-  snrThreshold = input('\nEnter SNR threshold to be used: ');
+  snrPercentile = input('\nEnter SNR percentile to be used: ');
   
   % confirm selections
   userConfirm =  input('\n Confirm entered values (y/n): ', 's');
   if isequal(userConfirm, 'n')
-    [startDate, stopDate, snrThreshold] = getUserInput;
+    [startDate, stopDate, snrPercentile] = getUserInput;
   end
   
   % load source files
