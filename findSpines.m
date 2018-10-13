@@ -296,8 +296,7 @@ function bpointInfo = classifyBpoints( segmentLabels, bpoints, epoints )
   size(fb)
   size(tb)
   for i = 1:numBpoints
-    i
-    labels = segmentLabels(fb(i) - 1:fb(i) + 1, tb(i) - 1:tb(i) + 1);
+    labels = segmentLabels(max(fb(i) - 1,1):min(fb(i) + 1, size(bpoints,1)), max(tb(i) - 1,1):min(tb(i) + 1, size(bpoints,2)));
     labels = unique(labels(labels > 0))';
     hasEpoint = ismember(labels, epointLabels);
     bpointInfo(1:numel(labels), :, i) = [labels; hasEpoint]';
