@@ -83,7 +83,7 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   colormap(h10, jet);
   shading(h10, 'flat');
   c = colorbar;
-  title(h10, '(7) Distance Transform Threshold at 1.5');
+  title(h10, '(7) Distance Transform Threshold at 1.25');
   xlabel(h10, 'Duration of event (in seconds)');
   ylabel(h10, 'Frequency (Hz)');
   set(h10, 'ydir', 'normal');

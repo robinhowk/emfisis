@@ -51,7 +51,7 @@ function [skeleton, dist, dist2] = skeletonize( ridges )
   
   % threshold distance transform
   dist2 = dist;
-  dist2(dist2 < 1.5) = NaN;
+  dist2(dist2 < 1.25) = NaN;
     
   % create binary image from distance transform 
   bwDist = dist2;
