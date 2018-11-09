@@ -161,8 +161,8 @@ addpath('matlab_cdf364_patch-64');
         end % end of burst
       else
         % no ridges, save mat file
-        save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
-          'features', 'paramfilename', 'timestamp', 'BuData');
+        %save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
+         % 'features', 'paramfilename', 'timestamp', 'BuData');
       end
       close all;
     end % end of bursts loop

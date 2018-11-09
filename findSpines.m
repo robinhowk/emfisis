@@ -13,6 +13,19 @@ function [ skeleton, dist, dist2, segmentLabels, spineLabels, numSpines, spines 
 
   [spineLabels, numSpines] = identifySpines( skeleton, segmentLabels, numSegments, bpoints, bpointInfo );
   
+  for i = 1:numSpines
+    [f, t] = find(spineLabels == i);
+    if numel(f) > 0
+      p = polyfit(t, f, 1);
+      a = abs(atand(p(1)));
+      if a < 10 || a > 85 || max(f) - min(f) < 5
+        curSpine = spineLabels == i;
+        spineLabels(curSpine) = 0;
+      end
+      
+    end
+  end
+  
   spines = zeros(size(spineLabels));
   spines(spineLabels > 0) = 1;
 end

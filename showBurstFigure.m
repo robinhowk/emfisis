@@ -33,7 +33,7 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   
   % snr histogram
   h15 = subplot(4,4,3);
-  hist(snrMap(:));
+  hist(snrMap(:), 50);
   title(h15, '(3) Histogram of SNR Values');
   xlabel(h15, 'SNR');
   
