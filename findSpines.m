@@ -15,15 +15,14 @@ function [ skeleton, dist, dist2, segmentLabels, spineLabels, numSpines, spines 
   
   for i = 1:numSpines
     [f, t] = find(spineLabels == i);
-    if numel(f) > 0
-      p = polyfit(t, f, 1);
-      a = abs(atand(p(1)));
-      if a < 10 || a > 85 || max(f) - min(f) < 5
+% %     if numel(f) > 0
+% %       p = polyfit(t, f, 1);
+% %       a = abs(atand(p(1)));
+      if max(f) - min(f) < 5 %|| a < 10 || a > 85
         curSpine = spineLabels == i;
         spineLabels(curSpine) = 0;
       end
-      
-    end
+%     end
   end
   
   spines = zeros(size(spineLabels));
@@ -381,7 +380,7 @@ function [newSpines, numNewSpines] = identifySpines( skeleton, segmentLabels, nu
       [rbarSquared, p] = calcAdjRsquared( curSegment );
       % determine angle of segment
       segmentAngle = abs(atand(p(1)));
-      if segmentAngle < 85 && segmentAngle > 10 && rbarSquared > 0.5
+      if 1%segmentAngle < 85 && segmentAngle > 10 && rbarSquared > 0.5
         numNewSpines = numNewSpines + 1;
         newSpines(curSegment) = numNewSpines;
         % update label assignment

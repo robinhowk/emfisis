@@ -14,7 +14,7 @@ addpath('matlab_cdf364_patch-64');
     fceTimes, fceLower, fceUpper, fceFilename, ...
     cdfDataMaster, cdfInfoMaster] = getUserInput;
   
-  version = 'v2.3.1';
+  version = 'v3.1.1';
   
   % load parameters
   paramfilename = setparam;
@@ -99,8 +99,8 @@ addpath('matlab_cdf364_patch-64');
         if isValid
           % create snr map of burst and select features about a given 
           % threshold
-          [snrMap, snrThreshold, features] = mapSnr(spect, 10*log10(imagefile), snrPercentile);
-          [ridges, bw_ridges] = find_ridges(paramfilename, features);
+%           [snrMap, snrThreshold, features] = mapSnr(spect, 10*log10(imagefile), snrPercentile);
+          [ridges, bw_ridges] = find_ridges(paramfilename, spect);
         else
           bw_ridges = zeros(size(spect));
         end
