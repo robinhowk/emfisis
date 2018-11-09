@@ -8,8 +8,8 @@ function [ridges, bwRidges, snrMap] = find_ridges(paramfilename, spect, snrThres
   minval = min(min(spect(spect ~= -Inf)));
   spect(spect == -Inf) = minval;
   imagefilenew = (spect - minval);
-  len = (length(thetavec)); %#ok<NODEF>
-  thetavec = thetavec(1:len/2);
+%   len = (length(thetavec)); %#ok<NODEF>
+%   thetavec = thetavec(1:len/2);
   [numrows, numcols] = size(spect);
 %   ridges = minval*ones(numrows,numcols);
   bwRidges = zeros(size(spect));
@@ -23,33 +23,33 @@ function [ridges, bwRidges, snrMap] = find_ridges(paramfilename, spect, snrThres
           right = min( (index2+3*r), numcols);
 
           subimage = imagefilenew(bottom:top, left:right);
-          radsubimage = radon(subimage,thetavec);
+%           radsubimage = radon(subimage,thetavec);
 %           maxsubimage = max(subimage(:));
 
 %           deltasub = (maxsubimage - curval)/(maxsubimage);
 %           minThreshold = prctile(subimage(:), 30);
 
-%           ind = find(subimage(:) == curval, 1, 'first');
-%           noiseImage = subimage;
-%           noiseImage(ind) = [];
-%           noise = std(noiseImage(:));
-%           snr = curval / noise;
+          ind = find(subimage(:) == curval, 1, 'first');
+          noiseImage = subimage;
+          noiseImage(ind) = [];
+          noise = std(noiseImage(:));
+          snr = curval / noise;
 
   %         figure;i1=subplot(1,2,1);imagesc(radsubimage);colormap jet;set(i1,'ydir', 'normal');
-          [val, ind] = max(max(radsubimage));
-          slice = radsubimage(:, ind);
+%           [val, ind] = max(max(radsubimage));
+%           slice = radsubimage(:, ind);
   %         i2=subplot(1,2,2);plot(slice);
   %         hold on;
-          [pks, loc] = findpeaks(slice);
+%           [pks, loc] = findpeaks(slice);
   %         findpeaks(slice, 'annotate', 'extents', 'widthreference', 'halfheight');
-          dist = abs(slice - (val/2));
-          [~, pl] = min(dist(1:loc));
-          [~, pr] = min(dist(loc:end));
-          pr = pr + loc - 1;
+%           dist = abs(slice - (val/2));
+%           [~, pl] = min(dist(1:loc));
+%           [~, pr] = min(dist(loc:end));
+%           pr = pr + loc - 1;
   %         plot([pl, pr], [slice(pl), slice(pr)], 'r*');
-          signal = sum(slice(pl:pr));
-          noise = sum(slice) - signal;
-          snr = signal / noise;
+%           signal = sum(slice(pl:pr));
+%           noise = sum(slice) - signal;
+%           snr = signal / noise;
 
   %         pause;close;
           snrMap(index1, index2) = snr;
