@@ -10,7 +10,7 @@ function [spinesInfo, totalSpines] = getSpinesInfo(spineLabels, numSpines, spect
     % get the time spanned by the spine
     [fcur, tcur] = find(curSpine == 1);
     tvec = min(tcur):1:max(tcur);
-    if numel(tvec) < 100 && ~isempty(tvec)
+    if numel(tvec) < 100 && ~isempty(tvec) && (max(fcur) - min(fcur) > 4)
       %--------------------------------------------------------------------
       % find sweeprate and chorus angle
       %--------------------------------------------------------------------

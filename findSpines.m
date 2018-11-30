@@ -18,10 +18,10 @@ function [ skeleton, dist, dist2, segmentLabels, spineLabels, numSpines, spines 
 % %     if numel(f) > 0
 % %       p = polyfit(t, f, 1);
 % %       a = abs(atand(p(1)));
-      if max(f) - min(f) < 5 %|| a < 10 || a > 85
-        curSpine = spineLabels == i;
-        spineLabels(curSpine) = 0;
-      end
+%       if max(f) - min(f) < 5 %|| a < 10 || a > 85
+%         curSpine = spineLabels == i;
+%         spineLabels(curSpine) = 0;
+%       end
 %     end
   end
   

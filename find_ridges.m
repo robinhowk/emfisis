@@ -1,5 +1,5 @@
 
-function [ridges, bwRidges, snrMap] = find_ridges(paramfilename, spect, snrThreshold, psdThreshold)
+function [ridges, bwRidges, snrMap, snrThreshold, psdThreshold] = find_ridges(paramfilename, spect, snrPercentile, psdPercentile)
   %paramfilename has the following variables: 
   % r,tausub,peakfactor_threshold,peakspread_threshold,spread,Delta_psd,Mdelta;
   % close all;
@@ -66,10 +66,10 @@ function [ridges, bwRidges, snrMap] = find_ridges(paramfilename, spect, snrThres
   ridges = spect;
   bwRidges1 = bwRidges;
   bwRidges2 = bwRidges;
-  bwRidges1(snrMap >= prctile(snrMap(:), snrThreshold)) = 1;
-  bwRidges2(spect >= prctile(spect(:), psdThreshold)) = 1;
+  snrThreshold = prctile(snrMap(:), snrPercentile);
+  psdThreshold = prctile(spect(:), psdPercentile);
+  bwRidges1(snrMap >= snrThreshold) = 1;
+  bwRidges2(spect >= psdThreshold) = 1;
   bwRidges = bwRidges1 | bwRidges2;
   ridges(bwRidges ~= 1) = nan;
-  figure;i1=subplot(2,1,1);imagesc(bwRidges1);colormap gray;set(i1, 'ydir', 'normal');
-  i2=subplot(2,1,2);imagesc(bwRidges2);colormap gray;set(i2, 'ydir', 'normal');
 end

@@ -1,5 +1,5 @@
-function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
-  features, segmentLabels, spineLabels, spines, timestamp, ...
+function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, psdThreshold, ...
+  ridges, segmentLabels, spineLabels, spines, timestamp, ...
   chorusElements, chorusCount, figname, fLow, fHigh, skeleton, dist, ...
   dist2, imagefile)
 
@@ -32,25 +32,16 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   set(h2, 'ydir', 'normal');
   
   % snr histogram
-  h15 = subplot(4,4,3);
-  hist(snrMap(:), 50);
-  title(h15, '(3) Histogram of SNR Values');
+  h15 = subplot(4,4,4);
+  histogram(snrMap(:), 50)
+  title(h15, '(4) Histogram of SNR Values');
   xlabel(h15, 'SNR');
   
-  % features
-  h3 = subplot(4,4,4);
-  features(features == min(spect(:))) = NaN;
-  pcolor(tspec, fspec, features);
-  colormap(h3, jet);
-  c = colorbar;
-  title(c, '10*log10(psd)');
-  title(h3, sprintf('(4) Features wiht SNR > \n%.01d', snrThreshold));
-  xlabel(h3, 'Duration of event (in seconds)');
-  ylabel(h3, 'Frequency (Hz)');
-  title(c, '10*log10(psd)');
-  set(h3, 'YDir', 'normal');
-  caxis([-160, -30]);
-  shading flat;
+  h3 = subplot(4,4,3);
+  hist(spect(:), 50);
+%   psdFit = histfit(double(spect(:) - min(spect(:)) + 1), 50, 'gamma')
+  title(h3, '(3) Histogram of PSD Values');
+  xlabel(h3, 'PSD');
   
   % ridges
   h13 = subplot(4,4,5);
@@ -59,7 +50,8 @@ function showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ridges, ...
   colormap(h13, jet);
   c = colorbar;
   title(c, '10*log10(psd)');
-  title(h13, '(5) Ridge Features');
+  s = sprintf('(5) Ridge Features with\nSNR > %.02f or PSD > %.02f', snrThreshold, psdThreshold);
+  title(h13, s);
   xlabel(h13, 'Duration of event (in seconds)');
   ylabel(h13, 'Frequency (Hz)');
   set(h13, 'ydir','normal');

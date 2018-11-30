@@ -10,7 +10,7 @@ addpath('matlab_cdf364_patch-64');
   % Set u
   %------------------------------------------------------------------------
   % get start date, stop date, snrThreshold and source files from user
-  [startDate, stopDate, snrPercentile, ppIntervals, ppFilename, ...
+  [startDate, stopDate, snrPercentile, psdPercentile ppIntervals, ppFilename, ...
     fceTimes, fceLower, fceUpper, fceFilename, ...
     cdfDataMaster, cdfInfoMaster] = getUserInput;
   
@@ -99,8 +99,7 @@ addpath('matlab_cdf364_patch-64');
         if isValid
           % create snr map of burst and select features about a given 
           % threshold
-%           [snrMap, snrThreshold, features] = mapSnr(spect, 10*log10(imagefile), snrPercentile);
-          [ridges, bw_ridges] = find_ridges(paramfilename, spect);
+          [ridges, bw_ridges, snrMap, snrThreshold, psdThreshold] = find_ridges(paramfilename, spect, snrPercentile, psdPercentile);
         else
           bw_ridges = zeros(size(spect));
         end
@@ -120,7 +119,7 @@ addpath('matlab_cdf364_patch-64');
           if numChorus > 0
             % create figure
             showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ...
-              ridges, features, segmentLabels, spineLabels, ...
+              psdThreshold, ridges, segmentLabels, spineLabels, ...
               spines, timestamp, chorusElements, numChorus, ...
               figname, fLow, fHigh, skeleton, dist, dist2, imagefile);
           
@@ -148,21 +147,21 @@ addpath('matlab_cdf364_patch-64');
                         
             % save mat file
             save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
-              'features', 'skeleton', 'segmentLabels', ...
+              'skeleton', 'segmentLabels', ...
               'spineLabels', 'numSpines', 'spines', 'chorusElements', ...
               'paramfilename', 'timestamp', 'BuData');
           else
             % save mat file
               save(resultFilename, 'imagefile', 'spect', 'fspec', ...
-                'tspec', 'features', 'skeleton', 'segmentLabels', ...
+                'tspec', 'skeleton', 'segmentLabels', ...
                 'spineLabels', 'numSpines', 'spines', ...
                 'paramfilename', 'timestamp', 'BuData');
           end
         end % end of burst
       else
         % no ridges, save mat file
-        %save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
-         % 'features', 'paramfilename', 'timestamp', 'BuData');
+        save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
+         'paramfilename', 'timestamp', 'BuData');
       end
       close all;
     end % end of bursts loop
@@ -214,7 +213,7 @@ end
 %           template
 %         ppFilename, fceFilename - path to these files
 %--------------------------------------------------------------------------
-function [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
+function [startDate, stopDate, snrThreshold, psdThreshold, ppIntervals, ppFilename, ...
   fceTimes, fceLower, fceUpper, fceFilename, ...
   cdfDataMaster, cdfInfoMaster] = getUserInput
   
@@ -223,11 +222,12 @@ function [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
   
   % get snr threshold from user
   snrThreshold = input('\nEnter SNR percentile to be used: ');
+  psdThreshold = input('\nEnter PSD percentile to be used: ');
   
   % confirm selections
   userConfirm =  input('\n Confirm entered values (y/n): ', 's');
   if isequal(userConfirm, 'n')
-    [startDate, stopDate, snrThreshold] = getUserInput;
+    [startDate, stopDate, snrThreshold, psdThreshold] = getUserInput;
   end
   
   % load source files
@@ -429,7 +429,7 @@ function showSummaryPanel( counts, edges, destinationFile )
   % distribution of sweeprates
   h2 = subplot(3,1,2);
   bins = (edges.sweeprates(1:end-1) + edges.sweeprates(2:end)) / 2;
-  bar(bins, counts.sweeprates / sum(counts.sweeprates), 'histc');
+  bar(bins, counts.sweeprates / 1000, 'histc');
   axis(h2, 'tight');
   title(h2, 'Distribution of Sweeprates');
   xlabel('Sweeprate (KHz / sec)');
@@ -437,7 +437,7 @@ function showSummaryPanel( counts, edges, destinationFile )
 
   h3 = subplot(3,1,3);
   bins = (edges.chorusAngles(1:end-1) + edges.chorusAngles(2:end)) / 2;
-  bar(bins, counts.chorusAngles / sum(counts.chorusAngles), 'histc');
+  bar(bins, counts.chorusAngles, 'histc');
   axis(h3, 'tight');
   title(h3, 'Distribution of Chorus Angles');
   ylabel('Estimated\newlineprobability');
