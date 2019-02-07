@@ -28,8 +28,8 @@ function [spinesInfo, totalSpines] = getSpinesInfo(spineLabels, numSpines, spect
       fp1(fp1 > numRows) = numRows;
       
       % reject angles over 88 degree to prevent indexing errors on vertical
-      % lines
-      if chorusAngle < 88
+      % lines, reject angles under 10, reject elements that are too small
+      if abs(chorusAngle) < 88 && numel(fp1) > 3 && abs(chorusAngle) > 5 && (max(fp1) - min(fp1)) > 4
         %------------------------------------------------------------------
         % find frequency vector
         %------------------------------------------------------------------

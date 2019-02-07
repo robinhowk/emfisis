@@ -71,5 +71,6 @@ function [ridges, bwRidges, snrMap, snrThreshold, psdThreshold] = find_ridges(pa
   bwRidges1(snrMap >= snrThreshold) = 1;
   bwRidges2(spect >= psdThreshold) = 1;
   bwRidges = bwRidges1 | bwRidges2;
+  bwRidges(spect < -90) = 0;
   ridges(bwRidges ~= 1) = nan;
 end

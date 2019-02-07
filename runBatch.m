@@ -14,7 +14,7 @@ addpath('matlab_cdf364_patch-64');
     fceTimes, fceLower, fceUpper, fceFilename, ...
     cdfDataMaster, cdfInfoMaster] = getUserInput;
   
-  version = 'v3.1.1';
+  version = 'v3.1.2';
   
   % load parameters
   paramfilename = setparam;
@@ -95,7 +95,18 @@ addpath('matlab_cdf364_patch-64');
         % create spectrogram
         [spect, fspec, fLow, fHigh, isValid] = trimSpectrogram(timestamp, imagefile, ...
           tspec, fspec, fceTimes, fceLower, fceUpper);
-
+        
+        % check if 80% of energy is in contained in 20% of data points
+        if isValid
+          spect0 = spect - min(spect(:));
+          totalEnergy = sum(spect0(:));
+          lastPixel = round(numel(spect) * 0.3);
+          sorted = sort(spect0(:), 'descend');
+          if sum(sorted(1:lastPixel)) < totalEnergy * .4
+            isValid = false;
+          end
+        end
+          
         if isValid
           % create snr map of burst and select features about a given 
           % threshold
@@ -529,7 +540,7 @@ function [spect, fspec, fLow, fHigh, isValid] = trimSpectrogram(timestamp, ...
     %Interpolates Fce Values based on given timestamp. Returns the upper and
     %lower fce limits. Linear interpolation is used on curTime between prevTime 
     %and nextTime to find these values.
-        if prevFce < 0 || nextFce < 0
+        if prevFce < 0 | nextFce < 0
             interpValue = NaN;
             return
         end
