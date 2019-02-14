@@ -14,7 +14,7 @@ addpath('matlab_cdf364_patch-64');
     fceTimes, fceLower, fceUpper, fceFilename, ...
     cdfDataMaster, cdfInfoMaster] = getUserInput;
   
-  version = 'v3.1.1';
+  version = 'v3.1.1.1';
   
   % load parameters
   paramfilename = setparam;
@@ -79,7 +79,8 @@ addpath('matlab_cdf364_patch-64');
       imagefile = data.imagefile;
       timestamp = data.timestamp
       BuData = data.BuData;
-            
+      resultFilename = sprintf('%s/%s_%s.mat', resultsFolder, strtok(filename, '.'), version)
+      
       %--------------------------------------------------------------------
       % check if current burst falls within a valid plasmapause interval. 
       % If so, trim spectrogram, scale to 10log10 and continue processing 
@@ -90,12 +91,15 @@ addpath('matlab_cdf364_patch-64');
           (timestamp + seconds(6)) > ppIntervals(:,1))
         % create filename for result and figure to be saved
         figname = sprintf('%s/%s_%s.jpg', figFolder, strtok(filename, '.'), version);
-        resultFilename = sprintf('%s/%s_%s.mat', resultsFolder, strtok(filename, '.'), version);
+        
         
         % create spectrogram
         [spect, fspec, fLow, fHigh, isValid] = trimSpectrogram(timestamp, imagefile, ...
           tspec, fspec, fceTimes, fceLower, fceUpper);
 
+        % apply lower threshold of -80 to spectrogram
+        spect(spect < -80) = nan;
+        
         if isValid
           % create snr map of burst and select features about a given 
           % threshold
@@ -160,8 +164,8 @@ addpath('matlab_cdf364_patch-64');
         end % end of burst
       else
         % no ridges, save mat file
-        save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
-         'paramfilename', 'timestamp', 'BuData');
+%        save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
+%         'paramfilename', 'timestamp', 'BuData');
       end
       close all;
     end % end of bursts loop
