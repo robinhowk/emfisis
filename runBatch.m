@@ -97,8 +97,8 @@ addpath('matlab_cdf364_patch-64');
         [spect, fspec, fLow, fHigh, isValid] = trimSpectrogram(timestamp, imagefile, ...
           tspec, fspec, fceTimes, fceLower, fceUpper);
 
-        % apply lower threshold of -80 to spectrogram
-        spect(spect < -80) = nan;
+        % apply lower threshold of -120  to spectrogram
+        spect(spect < -120) = nan;
         
         if isValid
           % create snr map of burst and select features about a given 
