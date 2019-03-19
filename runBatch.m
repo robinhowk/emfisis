@@ -7,14 +7,14 @@ addpath('matlab_cdf364_patch-64');
   % start time
   t1 = tic;
   %------------------------------------------------------------------------
-  % Set up
+  % Set u
   %------------------------------------------------------------------------
   % get start date, stop date, snrThreshold and source files from user
-  [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
+  [startDate, stopDate, snrPercentile, psdPercentile ppIntervals, ppFilename, ...
     fceTimes, fceLower, fceUpper, fceFilename, ...
     cdfDataMaster, cdfInfoMaster] = getUserInput;
   
-  version = 'v2.1.1';
+  version = 'v3.1.1.1';
   
   % load parameters
   paramfilename = setparam;
@@ -78,7 +78,9 @@ addpath('matlab_cdf364_patch-64');
       tspec = data.tspec;
       imagefile = data.imagefile;
       timestamp = data.timestamp
-            
+      BuData = data.BuData;
+      resultFilename = sprintf('%s/%s_%s.mat', resultsFolder, strtok(filename, '.'), version)
+      
       %--------------------------------------------------------------------
       % check if current burst falls within a valid plasmapause interval. 
       % If so, trim spectrogram, scale to 10log10 and continue processing 
@@ -89,20 +91,27 @@ addpath('matlab_cdf364_patch-64');
           (timestamp + seconds(6)) > ppIntervals(:,1))
         % create filename for result and figure to be saved
         figname = sprintf('%s/%s_%s.jpg', figFolder, strtok(filename, '.'), version);
-        resultFilename = sprintf('%s/%s_%s.mat', resultsFolder, strtok(filename, '.'), version);
+        
         
         % create spectrogram
         [spect, fspec, fLow, fHigh, isValid] = trimSpectrogram(timestamp, imagefile, ...
           tspec, fspec, fceTimes, fceLower, fceUpper);
+
+        % apply lower threshold of -120  to spectrogram
+        spect(spect < -120) = nan;
         
-        % create snr map of burst and select features about a given 
-        % threshold
-        [ snrMap, features ] = mapSnr( spect, 10*log10(imagefile), snrThreshold );
-                
+        if isValid
+          % create snr map of burst and select features about a given 
+          % threshold
+          [ridges, bw_ridges, snrMap, snrThreshold, psdThreshold] = find_ridges(paramfilename, spect, snrPercentile, psdPercentile);
+        else
+          bw_ridges = zeros(size(spect));
+        end
+        
         % if features are found continue
-        if ~isnan(sum(features(:))) && isValid
+        if sum(bw_ridges(:)) > 0
           % find spine of detected features
-          [skeleton, dist, grad, grad2, segmentLabels, spineLabels, numSpines, spines] = findSpines(features);
+          [skeleton, dist, dist2, segmentLabels, spineLabels, numSpines, spines] = findSpines(ridges);
                  
           if numSpines > 0
             % get information about each spine
@@ -114,9 +123,9 @@ addpath('matlab_cdf364_patch-64');
           if numChorus > 0
             % create figure
             showBurstFigure( tspec, fspec, spect, snrMap, snrThreshold, ...
-              features, segmentLabels, spineLabels, spines, timestamp, ...
-              chorusElements, numChorus, figname, fLow, fHigh, skeleton, ...
-              dist, grad, grad2);
+              psdThreshold, ridges, segmentLabels, spineLabels, ...
+              spines, timestamp, chorusElements, numChorus, ...
+              figname, fLow, fHigh, skeleton, dist, dist2, imagefile);
           
             if numRecords + numChorus > numel(cdfData.chorusEpoch)
               numEntries = 1000;
@@ -142,21 +151,21 @@ addpath('matlab_cdf364_patch-64');
                         
             % save mat file
             save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
-              'snrMap', 'features', 'skeleton', 'segmentLabels', ...
+              'skeleton', 'segmentLabels', ...
               'spineLabels', 'numSpines', 'spines', 'chorusElements', ...
-              'paramfilename', 'timestamp');
+              'paramfilename', 'timestamp', 'BuData');
           else
             % save mat file
               save(resultFilename, 'imagefile', 'spect', 'fspec', ...
-                'tspec', 'snrMap', 'features', 'skeleton', 'segmentLabels', ...
+                'tspec', 'skeleton', 'segmentLabels', ...
                 'spineLabels', 'numSpines', 'spines', ...
-                'paramfilename', 'timestamp');
+                'paramfilename', 'timestamp', 'BuData');
           end
         end % end of burst
       else
         % no ridges, save mat file
-        save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
-          'snrMap', 'features', 'paramfilename', 'timestamp');
+%        save(resultFilename, 'imagefile', 'spect', 'fspec', 'tspec', ...
+%         'paramfilename', 'timestamp', 'BuData');
       end
       close all;
     end % end of bursts loop
@@ -208,7 +217,7 @@ end
 %           template
 %         ppFilename, fceFilename - path to these files
 %--------------------------------------------------------------------------
-function [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
+function [startDate, stopDate, snrThreshold, psdThreshold, ppIntervals, ppFilename, ...
   fceTimes, fceLower, fceUpper, fceFilename, ...
   cdfDataMaster, cdfInfoMaster] = getUserInput
   
@@ -216,12 +225,13 @@ function [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
   [startDate, stopDate] = getDates;
   
   % get snr threshold from user
-  snrThreshold = input('\nEnter SNR threshold to be used: ');
+  snrThreshold = input('\nEnter SNR percentile to be used: ');
+  psdThreshold = input('\nEnter PSD percentile to be used: ');
   
   % confirm selections
   userConfirm =  input('\n Confirm entered values (y/n): ', 's');
   if isequal(userConfirm, 'n')
-    [startDate, stopDate, snrThreshold] = getUserInput;
+    [startDate, stopDate, snrThreshold, psdThreshold] = getUserInput;
   end
   
   % load source files
@@ -346,7 +356,6 @@ function [startDate, stopDate, snrThreshold, ppIntervals, ppFilename, ...
     end
     fceLower = str2double(fceLower);
     fceUpper = str2double(fceUpper);
-
     % trim to start and stop dates, include data on either side for
     % interpolation
     interval = find(fceTimes >= startDate & fceTimes < (stopDate + 1));
@@ -424,7 +433,7 @@ function showSummaryPanel( counts, edges, destinationFile )
   % distribution of sweeprates
   h2 = subplot(3,1,2);
   bins = (edges.sweeprates(1:end-1) + edges.sweeprates(2:end)) / 2;
-  bar(bins, counts.sweeprates / sum(counts.sweeprates), 'histc');
+  bar(bins, counts.sweeprates / 1000, 'histc');
   axis(h2, 'tight');
   title(h2, 'Distribution of Sweeprates');
   xlabel('Sweeprate (KHz / sec)');
@@ -432,7 +441,7 @@ function showSummaryPanel( counts, edges, destinationFile )
 
   h3 = subplot(3,1,3);
   bins = (edges.chorusAngles(1:end-1) + edges.chorusAngles(2:end)) / 2;
-  bar(bins, counts.chorusAngles / sum(counts.chorusAngles), 'histc');
+  bar(bins, counts.chorusAngles, 'histc');
   axis(h3, 'tight');
   title(h3, 'Distribution of Chorus Angles');
   ylabel('Estimated\newlineprobability');
@@ -498,6 +507,12 @@ function [spect, fspec, fLow, fHigh, isValid] = trimSpectrogram(timestamp, ...
     low = find(fspec > fLow, 1, 'first');
     low = low - 1;
     high = find(fspec > fHigh, 1, 'first');
+    if isempty(high) || high > 199
+      isValid = false;
+      fLow = fspec(1);
+      fHigh = fspec(end);
+      return;
+    end
     low = min(max(1, low), numel(fspec));
     high = max(min(numel(fspec), high), 1);
     if low ~= high
@@ -526,7 +541,7 @@ function [spect, fspec, fLow, fHigh, isValid] = trimSpectrogram(timestamp, ...
         prevTime = datenum(prevTime);
         nextTime = datenum(nextTime);
         curTime = datenum(curTime);
-
+        
         % intermediate values used for calculation
         a = (nextFce - prevFce) / (nextTime - prevTime);
         b = curTime - prevTime;

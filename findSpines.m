@@ -1,31 +1,31 @@
-function [ skeleton, dist, grad, grad2, segmentLabels, spineLabels, numSpines, spines ] = findSpines( ridges )
+function [ skel, dist, skelLabels, spines ] = findSpines( ridges )
 %UNTITLED Summary of this function goes here
 %   Detailed explanation goes here
     
-  % find the skeleton of ridge features
-  [skeleton, dist, grad, grad2] = skeletonize(ridges);
+  % find the mask of thresholded distancce transform applied to ridge features
+  [skel, dist] = createSpineMask(ridges);
 
-  % identify each segment of the skeleton
-  [segmentLabels, numSegments, bpoints, epoints] = identifySegments(skeleton);
+  % find peaks in each column of ridges  after applying bwDist mask
+%   findSpinePeaks(skel, dist);
+ 
+  % find the spine through each chorus such that there are no branch points
+  skelLabels = identifySpines( skel, ridges, dist );
 
-  % classify each branch point
-  bpointInfo = classifyBpoints( segmentLabels, bpoints, epoints );
-
-  [spineLabels, numSpines] = identifySpines( skeleton, segmentLabels, numSegments, bpoints, bpointInfo );
-  
-  spines = zeros(size(spineLabels));
-  spines(spineLabels > 0) = 1;
+  spines = zeros(size(skelLabels));
+  spines(skelLabels > 0) = 1;
 end
 
-
 %--------------------------------------------------------------------------
-% skeletonize
+% createSpineMask
 % Input: ridges - ridge features from SNR map
-% Output: spines - spines extracted from ridge along gradient
-% Extracts the domint ridges along the gradient, creating skeleton of ridge
-% features
+% Output: skel - binary mask of thresholded distance transform with
+% thinning and cleaning operations applied
+%         dist - distance transform of ridges features
+%         dist2 - thresholded distance transform
+% Extracts the domint ridges along the gradient using the distance
+% transform and applying a threshold
 %--------------------------------------------------------------------------
-function [skeleton, dist, grad, grad2] = skeletonize( ridges )
+function [skel, dist] = createSpineMask( ridges )
   % create binary version of ridge features
   ridges = ridges - min(ridges(:));
   bwRidges = ridges;
@@ -36,589 +36,590 @@ function [skeleton, dist, grad, grad2] = skeletonize( ridges )
   % calculate distance transform
   dist = bwdist(~bwRidges);
   dist(dist == 0) = NaN;
-
-  % calculate gradient of distance transform
-  grad = imgradient(dist);
-  maxgrad = max(grad(:));
-  grad = grad ./ maxgrad;
   
-  % apply threshold to gradient to extract skeleton
-  grad2 = grad;
-  grad2(grad < .75) = 2;
-  grad2(grad2 < 1) = 1;
-  grad2 = grad2 -1;
-  grad2(isnan(grad2)) = 0;
+  % create binary image from distance transform 
+  skel = dist;
+  skel(~isnan(skel)) = 1;
+  skel(isnan(skel)) = 0;
   
-  % thin and clean skeleton
-  skeleton = bwmorph(grad2, 'thin', Inf);
-  skeleton = bwmorph(skeleton, 'clean');
-
-  % pad skeleton so edges can be reached for further cleaning
-  skeleton = padarray(skeleton, [2 2], 0, 'both');
+  % thin and clean thresholded distance transform
+  skel = bwmorph(skel, 'close');
+  skel = bwmorph(skel, 'open');
+  skel = bwmorph(skel, 'thin', Inf);  
+  skel = bwmorph(skel, 'clean');
   
-  % remove branches of size 1
-  skeleton = removeSpurs(skeleton);
+  skel = skel .* dist;
+  skel(isnan(skel)) = 0;
+  skel(skel ~= 0) = 1;
+end
 
-  % straighten zig-zags in spines
-  skeleton = straightenSpines( skeleton);
 
-  % remove corners that do not affect connectivity
-  skeleton = removeCornersAndTs(skeleton);
+%--------------------------------------------------------------------------
+% findSpinePeaks
+% Input:  bwDist - mask of thresholded distance transform
+%         ridges - ridge features from SNR map
+% Output: bwPeaks - binary mask of the columnwise max values
+%         peaks - columnwise max values with their associated psd          
+% Multiplies ridges the bwDist and finds columnwise peaks with the result
+%--------------------------------------------------------------------------
+function [ peaks, bwPeaks ] = findSpinePeaks(skel, dist)
+  spines = dist .* skel;
+  bwPeaks = zeros(size(dist));
+  
+  for i = 1:size(dist, 2)
+    [~, locs] = findpeaks(spines(:, i));
+    if ~isempty(locs)
+      bwPeaks(locs, i) = 1;
+    end
+  end
+  
+  peaks = dist .* bwPeaks;
+  figure;i1=subplot(1,1,1);imagesc(bwPeaks);colormap gray;set(i1,'ydir','normal');pause;
+end
 
-  % remove padding
-  skeleton = skeleton(3:end-2, 3:end-2);
+
+%--------------------------------------------------------------------------
+% identifySpines
+% Input:  bwPeaks - mask of columnwise max points
+%         skel - mask of thresholded distance transform after performing
+%         thinning and cleaning
+% Output:
+% Groups the peaks found into their associated chrous spines and rejects
+% those that do not meet specified criteria
+%--------------------------------------------------------------------------
+function [spineLabels, numSpineLabels] = identifySpines( skel, ridges, dist )
+  % initalize spine labels to a 0 valued array. the selected paths through
+  % each spine will be saved to spine labels as they are found
+  spineLabels = zeros(size(skel));
+  numSpineLabels = 0;
+  
+  % created connected component labels for the peaks
+  [skelLabels, numLabels] = bwlabel(skel);
+  
+  % remove spines that are too small 
+  [labelIds, skelLabels] = removeSpines(numLabels, skelLabels);
+  
+  % find branch points based on Matlab's branch points and an approximation
+  % of those that were removed from peaks calculation  
+  % find branch points from thinned image
+  bpoints = bwmorph(skel, 'branchpoints');
+  
+%   bpointsNew = findBranchPoints(peakLabels, labels, labelIds, bpoints);
+
+  for i = labelIds
+    skelLabelMask = (skelLabels == i);
+    localBpoints = skelLabelMask .* bpoints;
+    numBpoints = sum(localBpoints(:));  
+    [fb, tb] = find(localBpoints == 1);
+    
+    % if the spine contains one or more branch points, find all valid paths
+    % to be saved through the spine. if there is no branch point, save the
+    % spine
+    if numBpoints > 0 
+      % find the segments making up the spine
+      [skelLabelIds, numSegments, removedPoints] = findSegments(skelLabelMask, localBpoints, numBpoints, fb, tb);
+      
+      % create the adjacency matrix of the segments
+      [adjMatrix, bpointLabels, numBpointLabels, edges] = createAdjMatrix(skelLabelIds, numSegments, removedPoints, localBpoints, fb, tb);
+      
+temp = skelLabelIds;
+temp(temp == 0) = nan;
+figure;i1=subplot(2,1,2);pcolor(temp);colormap(i1, colorcube);shading flat;c=colorbar;
+i2=subplot(2,1,1);pcolor(dist);colormap(i2, jet);shading flat;colorbar;
+      % find all paths through the spine
+      [paths, numPaths] = findPaths(adjMatrix, numBpointLabels);
+      
+      % get average distance transform values and quality of fit measure for each path
+      [paths, pathInfo, numPaths, pathMasks] = getPathInfo(paths, numPaths, skelLabelIds, numBpointLabels, bpointLabels, adjMatrix, dist);
+      
+      % remove invalid paths. an invalid path must meet one of the
+      % following criteria: (1) not enough data points, (2) poor measure of
+      % fit
+      [paths, pathInfo, numPaths, pathMasks] = removeInvalidPaths(paths, pathInfo, numPaths, pathMasks, adjMatrix, edges);
+
+%       selectedPathIndex = 1; % initialize to 1 to enter while loop
+      while numPaths > 0 %&& selectedPathIndex > 0
+        % select best path through the spine
+        selectedPathIndex = selectPath(paths, numPaths, pathInfo, numBpointLabels);
+
+        % after finding a path, do the following
+        % (1) save the path to spine labels
+        % (3) if this path contains a branch point, remove all paths that
+        % also pass through this point, including this path
+        % (4) update the path list, path info, path masks to only contain
+        % the remaining potential paths
+        % (5) update the number of remaining paths
+        numSpineLabels = numSpineLabels + 1;
+        spineLabels(squeeze(pathMasks(selectedPathIndex, :, :)) == 1) = numSpineLabels;
+        isBpoint = paths(selectedPathIndex, :) <= numBpointLabels& paths(selectedPathIndex, : ) > 0;
+        pathBpoints = paths(selectedPathIndex, isBpoint);
+        containsPathBpoints = sum(ismember(paths, pathBpoints), 2) > 0;
+        paths(containsPathBpoints, :) = [];
+        pathInfo(containsPathBpoints, :) = [];
+        pathMasks(containsPathBpoints, :) = [];
+        numPaths = numPaths - sum(containsPathBpoints);
+%         figure;pcolor(spineLabels);colormap colorcube;shading flat;
+%         pause;close
+      end 
+      close
+    else
+      numSpineLabels = numSpineLabels + 1;
+      spineLabels(skelLabelMask == 1) = numSpineLabels;
+    end
+  end
+  
+end
     
 %--------------------------------------------------------------------------
-% straightenSpines
-% Input: spines - binary skeletonized image
-% Output: spines - same image with zig-zags removed when it does not affect
-% connectivity
+% removeSpines
+% Inputs: numLabels - the number of connected components found after
+%         cleaning
+%         peakLabels - matrix of peak locations where values are connected
+%         component labels
+%         bwPeaks - mask of max peaks
+% Outputs:
+% Removes spines found that are only one pixel wide or do
+% not meet a frequency span criteria. This is done before spines are
+% processed
 %--------------------------------------------------------------------------
-  function [ spines ] = straightenSpines( spines )
-    shiftLeft = [1 0 0; 0 1 0; 1 0 0];
-    shiftUp = [1 0 1; 0 1 0; 0 0 0];
-    shiftRight = [ 0 0 1; 0 1 0; 0 0 1];
-    shiftDown = [0 0 0; 0 1 0; 1 0 1];
-
-    [numRows, numCols] = size(spines);
-
-    for i = 2:numCols-1
-      tempArray = spines(:, i-1:i+1);
-      for j = 2:numRows-1
-        subimage = tempArray(j-1:j+1, :);
-        if isequal(subimage, shiftLeft)
-          subimage(2) = 1;
-          subimage(5) = 0;
-          tempArray(j-1:j+1, :) = subimage;
-        elseif isequal(subimage, shiftUp)
-          subimage(4) = 1;
-          subimage(5) = 0;
-          tempArray(j-1:j+1, :) = subimage;
-        elseif isequal(subimage, shiftRight)
-          subimage(8) = 1;
-          subimage(5) = 0;
-          tempArray(j-1:j+1, :) = subimage;
-        elseif isequal(subimage, shiftDown)
-          subimage(6) = 1;
-          subimage(5) = 0;
-          tempArray(j-1:j+1, :) = subimage;
-        end
-      end
-      spines(:, i-1:i+1) = tempArray;
+function [labelIds, peakLabels] = removeSpines(numLabels, peakLabels)
+  removedLabels = false(numLabels, 1);
+  for i = 1:numLabels
+    peakLabelMask = (peakLabels == i);
+    [fPeaks, tPeaks] = find( peakLabelMask == 1);
+    if isempty(tPeaks) || numel(unique(tPeaks)) == 1 || max(fPeaks) - min(fPeaks) < 5
+      peakLabels(peakLabels == i) = 0;
+      removedLabels(i) = true;
     end
   end
-
-%--------------------------------------------------------------------------
-% removeCornersAndTs
-% Input: spines - binary skeletonized image
-% Output: spines - same image with corner points and t points removed that
-% generate uncessary branch points
-%--------------------------------------------------------------------------
-  function [ spines ] = removeCornersAndTs (spines)
-    % middle index of subimage
-    mid = 13;
-
-    % masks of possible corner positions
-    cornerLRV = [0 0 0; 1 1 0; 0 1 0; 0 1 0];
-    cornerURV = flip(cornerLRV);
-    cornerULV = fliplr(cornerURV);
-    cornerLLV = flip(cornerULV);
-    cornerURH = [0 0 1 0; 1 1 1 0; 0 0 0 0];
-    cornerLRH = flip(cornerURH);
-    cornerLLH = fliplr(cornerLRH);
-    cornerULH = fliplr(cornerURH);
-    % masks for possible T-intersection positions
-    t1 = [0 1 0; 1 1 1; 0 0 0];
-    t2 = [0 1 0; 0 1 1; 0 1 0];
-    t3 = [0 0 0; 1 1 1; 0 1 0];
-    t4 = [0 1 0; 1 1 0; 0 1 0];
-
-    % find all points in the spine
-    [f, t] = find(spines == 1);
-
-
-    % for each point, determine if it is a corner. If it is a corner,
-    % remove it from the spine
-    for i = 1:numel(f)
-      subimage = spines(f(i)-2:f(i)+2, t(i)-2:t(i)+2);
-
-      if isequal(subimage(2:5, 2:4), cornerLRV)
-        subimage(mid) = 0;
-      elseif isequal(subimage(1:4, 2:4), cornerURV)
-        subimage(mid) = 0;
-      elseif isequal(subimage(1:4, 2:4), cornerULV)
-        subimage(mid) = 0;
-      elseif isequal(subimage(2:5, 2:4), cornerLLV)
-        subimage(mid) = 0;
-      elseif isequal(subimage(2:4, 1:4), cornerURH)
-        subimage(mid) = 0;
-      elseif isequal(subimage(2:4, 1:4), cornerLRH)
-        subimage(mid) = 0;
-      elseif isequal(subimage(2:4, 2:5), cornerLLH)
-        subimage(mid) = 0;
-      elseif isequal(subimage(2:4, 2:5), cornerULH)
-        subimage(mid) = 0;
-      elseif isequal(subimage(2:4, 2:4), t1)
-        subimage(mid) = 0;
-      elseif isequal(subimage(2:4, 2:4), t2)
-        subimage(mid) = 0;
-      elseif isequal(subimage(2:4, 2:4), t3)
-        subimage(mid) = 0;
-      elseif isequal(subimage(2:4, 2:4), t4)
-        subimage(mid) = 0;
-      end
-
-      spines(f(i), t(i)) = subimage(mid);
-    end
-  end
-
-%--------------------------------------------------------------------------
-% removeSpurs
-% Inputs: spines - binary skeletonized image
-% Outputs: spines - same image with branches of lenght 1 that generate
-% unnecessary branch boints
-%--------------------------------------------------------------------------
-  function [ spines ] = removeSpurs(spines)
-    % find branchpoints
-    bpoints = bwmorph(spines, 'branchpoints');
-    [fb, tb] = find(bpoints == 1);
-
-    % find spurs
-    spurs = bwmorph(spines, 'spur');
-    spurs = spines - spurs;
-    spurs = find(spurs == 1);
-    [fs, ts] = ind2sub(size(spines), spurs);
-
-    % calculate distance between each branch point and spur
-    distSpurBpoint = sqrt( (fs' - fb) .^ 2 + (ts' - tb) .^ 2);
-
-    % determine if there is a branchpoint - spur combination with a
-    % distance less than 1.5 in each column. 1.5 is large enough to account
-    % for two diagonal pixels.
-    isValidSpur = logical(sum(distSpurBpoint < 1.5));
-
-    % identify spurs to be removed
-    spurs = spurs(isValidSpur);
-    spines(spurs) = 0;    
-  end
+  labelIds = 1:numLabels;
+  labelIds = labelIds(~removedLabels);
 end
 
-
 %--------------------------------------------------------------------------
-% Identify Segments
-% Input: spines
-% Output: segmentLabels - matrix with each segment identified by a number
-%       numSegments - total number of segments identified
-%       ePoints - binary matrix with location of all end points marked 1
-%       bPoints - binary matrix with location of all branch points marked 1
-% Finds all the segments making up spines
+% findBranchPoints
+% Inputs:
+% Outputs:
+%
 %--------------------------------------------------------------------------
-function [segmentLabels, numSegments, bpoints, epoints] = identifySegments(spines)
-  % Identify end points and branch points. An extra point can be paired
-  % with the branch point when necessary to fully disconnect segments.
-  spines = padarray(spines, [1, 1], 0, 'both');
-  bpoints = bwmorph(spines, 'branchpoints');
-  epoints = zeros(size(spines));
+% function [bpointsNew] = findBranchPoints(peakLabels, labels, labelIds, bpoints)    
+%   for i = labelIds
+%     peakLabelMask = (peakLabels == i);
+%     skelLabelMask = (labels == i);
+%     bpointsNew = bpoints;
+%     % find local branch points in the skeleton and peaks. If the number of
+%     % branch points are equal, all local branch points were reatained. If
+%     % not find an approximation of the brnach point.
+%     localBpoints = bpoints .* skelLabelMask;
+%     existingBpoints = bpoints .* peakLabelMask;
+%     numLocalBpoints = sum(localBpoints(:));
+%     numExistingBpoints = sum(existingBpoints(:));
+%     
+%     % if a branch point has been removed, find an approximation as a
+%     % replacement
+%     if numLocalBpoints ~= numExistingBpoints
+%       [fb, tb] = find(localBpoints == 1);
+%       [f, t] = find(peakLabelMask == 1);
+%       dist = zeros(numel(f), numel(fb));
+%       for j = 1:numel(f)
+%         for k = 1:numel(fb)
+%           dist(j, k) = sqrt((f(j)-fb(k))^2 + (t(j)-tb(k))^2);
+%         end
+%       end
+%       [m, ind] = min(dist);
+%       
+%       % if minimum distance is zero, the branch point still remains, if not
+%       % replace with an adjacent point
+%       for j = 1:numel(m)
+%         if m(j) == 1
+%           bpointsNew(fb(j), tb(j)) = 0;
+%           bpointsNew(f(ind(j)), t(ind(j))) = 1;
+%         end
+%       end
+%     end
+%   end
+% end
+  
+ 
+%--------------------------------------------------------------------------
+% findSegments
+%
+%
+%--------------------------------------------------------------------------
+function [skelLabelIds, numSegments, removedPoints] = findSegments(skelLabelMask, localBpoints, numBpoints, fb, tb)
+  skelLabelMask = skelLabelMask - localBpoints;
+  [segmentIds, numSegments] = bwlabel(skelLabelMask);
 
-  [fs, ts] = find(spines == 1);
+  % check to see if connectivity was preserved even after removing
+  % branch points. in cases where this happens an additional point will
+  % need to be removed.
+  removedPoints = nan(numBpoints, 2);
+  
+  % to check if connectivity is preserved, look at 3x3 window around
+  % each branch point. if each point in the window does not have a
+  % unique label, connectivity is preserverd and another point must be
+  % removed.
+  for j = 1:numBpoints
+    % create window around branch point
+    subimageMask = skelLabelMask(fb(j)-1:fb(j)+1, tb(j)-1:tb(j)+1);
+    subimageIds = segmentIds(fb(j)-1:fb(j)+1, tb(j)-1:tb(j)+1) .* subimageMask;
 
-  % extra points to fully disconnect spines
-  fx = zeros(10, 1);
-  tx = fx;
-  % saves branch point associated with the extra point as an ordered pair
-  % (t, f)
-  newBpointPair = zeros(10,2);
-  numNewBpoints = 0;
-
-  for i = 1:numel(ts)
-    f = fs(i);t = ts(i);
-    subimage = spines(f-1:f+1, t-1:t+1);
-    % if the current point is an end point, the subimage will
-    % contain only two pixels
-    if sum(subimage(:)) == 2
-        epoints(f, t) = 1;
-
-    % if the current point is a branch point, check if it fully
-    % disconnects the adjacent segments
-    elseif bpoints(f, t) == 1
-      subimage(5) = 0;
-      [spineLabels, numCC] = bwlabel(subimage);
-      % iterate through each label and remove a point if there is
-      % more than 1 associated with that label
-      for j = 1:numCC
-        if nnz(spineLabels == j) > 1
-            [fnew, tnew] = find(spineLabels == j, 1, 'first');
-            % increment number of new branch points and add new
-            % branch point to list of extra branch points
-            numNewBpoints = numNewBpoints + 1;
-            fx(numNewBpoints) = f + fnew - 2;
-            tx(numNewBpoints) = t + tnew - 2;
-            newBpointPair(numNewBpoints, :) = [t, f];
+    if sum(subimageMask(:)) ~= numel(unique(subimageIds)) - 1
+      % if the sum each column is 1, removing the middle pixel
+      % always changes the connnectivity
+      if sum(subimageMask) == [1 1 1]
+        % find coordinate in subimage of the point in the middle
+        % column, this point will be removed
+        [ind, ~] = find(subimageMask(:, 2) == 1);
+        if ind == 3
+          removedPoints(j,:) = [fb(j)+1, tb(j)];
+          skelLabelMask(fb(j)+1, tb(j)) = 0;
+        elseif ind == 1
+          removedPoints(j,:) = [fb(j)-1, tb(j)];
+          skelLabelMask(fb(j)-1, tb(j)) = 0;
         end
+         [segmentIds, numSegments] = bwlabel(skelLabelMask);
       end
     end
-  end
-    
-  tx = tx(1:numNewBpoints);
-  fx = fx(1:numNewBpoints);
-
-  newBpoints = zeros(size(spines));
-  newBpoints(sub2ind(size(spines), fx, tx)) = 1;
-
-  segments = spines & ~bpoints;
-  segments = segments & ~newBpoints;
-  [segmentLabels, numSegments] = bwlabel(segments);
-
-  % add the extra branch points back and include them in the closest
-  % segment
-  [fs, ts] = find(segmentLabels > 0);
-  [~, ind] = min(sqrt((fs - fx') .^ 2 + (ts - tx') .^ 2));
-  for j = 1:numel(ind)
-    tempLabel = segmentLabels(fs(ind(j)), ts(ind(j)));
-    segmentLabels(fx(j), tx(j)) = tempLabel;
   end
   
-  segmentLabels = segmentLabels(2:end-1, 2:end-1);
-  bpoints = bpoints(2:end-1, 2:end-1);
-  epoints = epoints(2:end-1, 2:end-1);
+  % create labeled matricies
+  % add one to the number of segments, this acts as a placeholder for the
+  % branch points
+  numSegments = numSegments + 1;
+  % add the removed points back in, assigning the id of the closest
+  % connected point
+  for j = 1:size(removedPoints,1)
+    if ~isnan(removedPoints(j,1))
+      % create subimage around the point
+      subimage = segmentIds(removedPoints(j,1)-1:removedPoints(j,1)+1, removedPoints(j,2)-1:removedPoints(j,2)+1);
+      % find the closest non-zero point from the middle (2,2)
+      [y,x] = find(subimage ~= 0);
+      dist = sqrt( (2-y).^2 + (2-x).^2);
+      [~, ind] = min(dist);
+      % get the label of the closest point
+      label = subimage(y(ind), x(ind));
+      % assign the removed point this label
+      segmentIds(removedPoints(j,1), removedPoints(j,2)) = label;
+    end
+  end
+  
+  % add the branch points back into the labels, assigning them a new label
+  % equal to one higher than the number of segments founds
+  skelLabelIds = segmentIds + (localBpoints * numSegments);
 end
 
-
 %--------------------------------------------------------------------------
-% Classify Branch Points
-% Input: segmentLabels - matrix with each segment identified by a number
-%       ePoints - binary matrix with location of all end points marked 1
-%       bPoints - binary matrix with location of all branch points marked 1
-% Output: bpointInfo - see below
-% For each branch point determine the following:
-% (1) Adjacent branches
-% (2) True/False does adjacent branch have an endpoint
-% saved in the matrix configuration 
-% [adjacent branches, has endpoint, branch point number]
+% createAdjMatrix
+%
+%
+%
 %--------------------------------------------------------------------------
-function bpointInfo = classifyBpoints( segmentLabels, bpoints, epoints )
-  % locate each branch point
-  [fb, tb] = find(bpoints == 1);
-  numBpoints = numel(fb);
-
-  % identify which segments have an endpoint
-  epointLabels = unique(epoints .* segmentLabels);
-  epointLabels(epointLabels == 0) = [];
-
-  % preallocate array for bpointInfo
-  bpointInfo = zeros(3, 2, numBpoints);
-
-  % create bpointInfo matrix
-  for i = 1:numBpoints
-    labels = segmentLabels(fb(i) - 1:fb(i) + 1, tb(i) - 1:tb(i) + 1);
-    labels = unique(labels(labels > 0))';
-    hasEpoint = ismember(labels, epointLabels);
-    bpointInfo(1:numel(labels), :, i) = [labels; hasEpoint]';
+function [adjMatrix, bpointLabels, numBpointLabels, edges] = createAdjMatrix(skelLabelIds, numSegments, removedPoints, localBpoints, fb, tb)  
+  % initalize the adjacency matrix with size n one less than the number of
+  % segments passed as the last segment is a place holder for branch points
+  
+  % create a matrix that stores the segments adjacent to each branch point
+  adjSegmentsMatrix = zeros(numel(fb), numSegments - 1);
+  
+  for i = 1:numel(fb)
+    adjSegments = unique(skelLabelIds(fb(i)-1:fb(i)+1, tb(i)-1:tb(i)+1));
+    adjSegments(adjSegments == numSegments | adjSegments == 0) = [];
+    adjSegmentsMatrix(i, adjSegments) = 1;
+  end
+  
+  % iterate through the points that were removed when breaking connectivity
+  % to find if any adjacent segments were missed. this completes the
+  % adjacency information for each bpoint
+  for i = 1:size(removedPoints,1)
+    if ~isnan(removedPoints(i,1))
+      adjSegments = unique(skelLabelIds(removedPoints(i,1)-1:removedPoints(i,1)+1, removedPoints(i,2)-1:removedPoints(i,2)+1));
+      adjSegments(adjSegments == numSegments | adjSegments == 0) = [];
+      adjSegmentsMatrix(i, adjSegments) = 1;
+    end
+  end
+  
+  % find clusters of bpoints. when two or more branch points are connected,
+  % the shared segment must be traversed when it is not necessary
+  [bpointLabels, numBpointLabels] = bwlabel(localBpoints);
+  
+  % create the adjacency matrix from the connectivity information. this
+  % will be done by creating an edge list with the following structure
+  % [node 1, node 2, segment id, angle]
+  % to create the edge list, begin by iterating through the branch points
+  % labels and the associated branch points, defining an edge for each 
+  % adjacent segment. node 1 up to the number of branch points will always 
+  % be in refecernce to the branch point. if an edge is found to be previously
+  % defined, this indicates it is connected to a segment with two branch
+  % points. in this case a new edge is not defined but node 2 of the
+  % previous edge will be updated to the current branch point being
+  % iterated over
+  edges = zeros(numSegments - 1, 4);
+  numNodes = numBpointLabels + 1;
+  visitedSegment = false(numSegments - 1, 1);  %keeps track of defined edges
+  
+  for i = 1:numBpointLabels
+    % find the index in fb and tb of the corresponding branch points
+    [fbl, tbl] = find(bpointLabels == i);
+    bpointInd = ismember(fb, fbl) == 1 & ismember(tb, tbl) == 1;
+    % get the segments adjacent to this cluster
+    [~, curSegments] = find(adjSegmentsMatrix(bpointInd, :) > 0);
+    curSegments = unique(curSegments);
+    
+    % iterate over each segment to create an edge
+    for j = 1:numel(curSegments)
+      if ~visitedSegment(curSegments(j))
+        edges(curSegments(j), 1:3) = [i, numNodes, curSegments(j)];
+        % calculate the angle of inclination of the edge
+        edgeMask = skelLabelIds == curSegments(j);
+        [~, edgeFit1] = calcAdjRsquared(edgeMask, 1);
+        edges(curSegments(j), 4) = atand(edgeFit1(1));
+        numNodes = numNodes + 1;
+        visitedSegment(curSegments(j)) = true;
+      else
+        numNodes = numNodes - 1; %remove increment since there is no new node
+        prevNodeId = edges(curSegments(j),2);
+        edges(curSegments(j), 2) = i;
+        % decrement nodes that were at a higher index than the one removed
+        nodesToUpdate = find(edges(:, 2) > prevNodeId);
+        edges(nodesToUpdate, 2) = edges(nodesToUpdate, 2) - 1;
+      end
+    end
+  end
+  % create adjacency matrix from the edge list, entries in the matrix are
+  % either 0 for non-connected nodes or the valued of the segment id for
+  % connected nodes
+  adjMatrix = zeros(numSegments - 1);
+  for i = 1:numSegments - 1
+    adjMatrix(edges(i,1), edges(i,2)) = edges(i,3);
+    adjMatrix(edges(i,2), edges(i,1)) = edges(i,3);
   end
 end
 
-
+%--------------------------------------------------------------------------
+% modeled after this code: 
+% https://www.geeksforgeeks.org/find-paths-given-source-destination/
+%--------------------------------------------------------------------------
+function [allPaths, totalPaths] = findPaths(adjMatrix, numBpoints)
+  totalPaths = 0;
+  allPaths = [];
+  completed = false(size(adjMatrix,1), 1);
+  for m = 1:size(adjMatrix,1)
+    visited = false(size(adjMatrix,1),1);
+    path = [];
+    pathIndex = 1;
+    nodePaths = zeros([1, size(adjMatrix,1)]);
+    nodePathCount = 0;
+    [nodePaths, nodePathCount] = findPathsHelper(adjMatrix, m, visited, path, pathIndex, nodePaths, nodePathCount, completed, numBpoints);
+    if nodePathCount > 0
+      allPaths = [allPaths; zeros(nodePathCount, size(adjMatrix,1))];
+      allPaths(totalPaths + 1:totalPaths + nodePathCount, :) = nodePaths;
+      totalPaths = totalPaths + nodePathCount;
+    end
+    if m > numBpoints
+      completed(m) = true;
+    end
+  end
+end
+  
 %--------------------------------------------------------------------------
 %
-% Input:
-% Output:
-% Identify spines from the skeleton image. 
+%
+%
 %--------------------------------------------------------------------------
-function [newSpines, numNewSpines] = identifySpines( skeleton, segmentLabels, numSegments, bpoints, bpointInfo )
-  % get location of branch points
-  [fb, tb] = find(bpoints == 1);
+function [nodePaths, nodePathCount] = findPathsHelper(adjMatrix, startNode, visited, path, pathIndex, nodePaths, nodePathCount, completed, numBpoints)
+  visited(startNode) = true;
+  path(pathIndex) = startNode;
+  pathIndex = pathIndex + 1;
 
-  % create visited arrays for keeping track of processed segments and
-  % bpoints
-  visitedSegments = false(numSegments, 1);
-  visitedBpoints = false(numel(fb), 1);
+  % find adj nodes
+  adjNodes = find(adjMatrix(startNode, :) > 0);
 
-  % keep track of spines that are valid
-  numNewSpines = 0;
-  newSpines = zeros(size(segmentLabels));
-  % keep track of label reassignemnts
-  newLabels = zeros(numSegments, 1);
-
-  %----------------------------------------------------------------------
-
-  % Begin by processing skeltons without branch points. Find these
-  % segments
-  % find each component in the skeleton
-  [skelLabels, ~] = bwlabel(skeleton);
-  skels = unique(skelLabels .* bpoints);
-  skels(skels == 0) = [];
-  skelLabels(ismember(skelLabels, skels)) = 0;
-  noBpointLabels = unique(segmentLabels(skelLabels > 0 & segmentLabels > 0));
-  % for each of these segments determine if the segment is of sufficient
-  % size and inside desired range of angles. As each segment is
-  % processed, mark it as visited
-  for i = noBpointLabels'
-    curSegment = segmentLabels == i;
-    if nnz(curSegment) > 4
-      % calculate the goodness of fit
-      [rbarSquared, p] = calcAdjRsquared( curSegment );
-      % determine angle of segment
-      segmentAngle = abs(atand(p(1)));
-      if segmentAngle < 85 && segmentAngle > 10 && rbarSquared > 0.5
-        numNewSpines = numNewSpines + 1;
-        newSpines(curSegment) = numNewSpines;
-        % update label assignment
-        newLabels(i) = numNewSpines;
-      else
-        newLabels(i) = NaN;
-      end
-    else
-      newLabels(i) = NaN;
-    end
-    visitedSegments(i) = true;
+  % if all adjacent nodes have been visited, all paths from starting node
+  % have been found
+  if sum(visited(adjNodes) == false) == 0      
+%     if sum(path <= numBpoints) >= 2 || numBpoints == 1
+      nodePathCount = nodePathCount + 1;
+      pathIndex = pathIndex - 1;
+      nodePaths(nodePathCount, 1:pathIndex) = path;
+%     end
   end
-  
-  %------------------------------------------------------------------------
 
-  % Next find trunk segments. Trunk segments have 1 branch containg an
-  % endpoint and the remaining segments end with another branch point.
-  % Grow the spine from the trunk.
-
-  % get all potential trunk points
-  curBpoints = find((squeeze(sum(bpointInfo(:, 2, :))) == 1) == true);
-  dist = sqrt( (fb(curBpoints)' - fb) .^ 2 + (tb(curBpoints)' - tb) .^ 2);
-  closeBpoints = dist < 10 & dist > 0;
-
-  for i = 1:numel(curBpoints)
-    adjCurBpoint = squeeze(bpointInfo(:, 1, curBpoints(i)));
-    adjCurBpoint = adjCurBpoint(adjCurBpoint > 0);
-    adjSegments = squeeze(bpointInfo(:, 1, closeBpoints(:,i)));
-    adjSegments = adjSegments(adjSegments > 0);
-    connectedSegments = adjCurBpoint(ismember(adjCurBpoint, adjSegments));
-
-    if numel(connectedSegments) == 2 && ~visitedBpoints(curBpoints(i))
-      % create trunk
-      spine = ismember(segmentLabels, connectedSegments);
-      spine(fb(curBpoints(i)), tb(curBpoints(i))) = 1;
-      % update segment labels
-      numNewSpines = numNewSpines + 1;
-      newLabels(connectedSegments) = numNewSpines;
-      unconnectedSegments = adjCurBpoint(~ismember(adjCurBpoint, connectedSegments));
-      newLabels(unconnectedSegments) = NaN;
-      % mark adjacent segments as visited
-      visitedSegments(adjCurBpoint) = true;
-      % mark bpoint as visited
-      visitedBpoints(curBpoints(i)) = true;
-
-      % get connected branch points
-      connectedBpoints = find((closeBpoints(:, i) & ~visitedBpoints) == 1);
-
-      % as long as there are more connected branch points, add segments to
-      % the trunk. 
-      while ~isempty(connectedBpoints)
-        % get the next point and remove it from the list
-        newBpoint = connectedBpoints(1);
-        % remove from the list
-        connectedBpoints(1) = [];
-        
-        % find number of spurs (segments ending with end point)
-        numSpurs = nnz(bpointInfo(:, 2, newBpoint));
-        
-        % if the branch point is a fork, do nothing
-        if numSpurs ~= 0
-          % add branchpoint to the spine
-          spine(fb(newBpoint), tb(newBpoint)) = 1;
-          % mark branch point as visited
-          visitedBpoints(newBpoint) = true;
-          
-          % find unvisited segments
-          adjSegments = squeeze(bpointInfo(:, 1, newBpoint));
-          adjSegments = adjSegments(adjSegments > 0);
-          newSegments = adjSegments(~visitedSegments(adjSegments));
-          if ~isempty(newSegments)
-            % try each combination of segments with the exisiting spine
-            gof = zeros(numel(newSegments), 1);
-            for j = 1:numel(newSegments)
-              curSegment = segmentLabels == newSegments(j);
-              testSpine = curSegment + spine;
-              gof(j) = calcAdjRsquared(testSpine);
-            end
-
-            [~, maxGof] = max(gof);
-            newSegment = newSegments(maxGof);
-            % add selected segment to the spine
-            spine(segmentLabels == newSegment) = 1;
-            % update segment label
-            newLabels(newSegment) = numNewSpines;
-            unusedSegments = newSegments(~ismember(newSegments, newSegment));
-            newLabels(unusedSegments) = -1;
-            % if selected segment does not contain an endpoint, find the
-            % branch point on the other end
-            isSpur = bpointInfo(adjSegments == newSegment, 2, newBpoint);
-            if ~isSpur
-              connectedNewSegment =  squeeze(sum(ismember(bpointInfo(:, 1, :), newSegment)));
-              nextBpoint = find(connectedNewSegment & ~visitedBpoints == 1);
-              connectedBpoints = [connectedBpoints; nextBpoint];
-            end
-
-            visitedSegments(adjSegments) = true;
-          end
-        end
-      end
-      % increment number of new spines and save to new spines
-      newSpines(spine) = numNewSpines;
+  % call recursive function for each of startNodes neighbors.
+  for k = adjNodes
+    if ~visited(k) && ~completed(k)
+      [nodePaths, nodePathCount] = findPathsHelper(adjMatrix, k, visited, path, pathIndex, nodePaths, nodePathCount, completed, numBpoints);
     end
   end
 
-  %------------------------------------------------------------------------
-  
-  % find the remaining unvisited branch points that are not a fork. For
-  % each branch point, select two best fitting spines. When creating test
-  % spine for fitting, check for visited branches. If the branch has been
-  % visited, get the updated label and corresponding spine from new spines.
-  % If the rejected branch ends in a branch point, do not mark it as visted
-  % because it could be picked up by another branch point.
-  curBpoints = find((squeeze(sum(bpointInfo(:, 2, :))) ~= 0) == true);
-  curBpoints = curBpoints(~visitedBpoints(curBpoints));
-  
-  for i = curBpoints'
-    % get info about current branch point
-    curBpointInfo = bpointInfo(:, :, i);
-    adjSegments = curBpointInfo(:, 1);
-    adjSegments = adjSegments(adjSegments > 0);
-    
-    % mark branch point as visited
-    visitedBpoints(i) = true;
+  % remove current vertex from path and mark it unvisited
+  pathIndex = pathIndex - 1;
+  visited(startNode) = false;
+end
+   
+%--------------------------------------------------------------------------
+% getPathInfo
+%
+%
+%
+%--------------------------------------------------------------------------
+% path info: [average distance transform values, measure of fit]
+function [paths, pathInfo, numPaths, pathMasks] = getPathInfo(paths, numPaths, skelLabelIds, numBpointLabels, bpointLabels, adjMatrix, dist)
+  pathInfo = zeros(numPaths, 3);
+  pathMasks = zeros(numPaths, size(skelLabelIds, 1), size(skelLabelIds,2));
 
-    % find each combination of branches
-    combos = combnk(adjSegments, 2);
-    
-    % preallocate for each combination
-    segments = zeros(size(segmentLabels,1), ...
-      size(segmentLabels,2), numel(adjSegments));
-
-    % find goodness of fit for each combination
-    gof = zeros(size(combos, 1), 1);
-    for j = 1:numel(gof)
-      % check if either segment has been included in a previous spine
-      curLabels = combos(j, :);
-      preVisited = visitedSegments(curLabels);
-
-      if nnz(preVisited) > 0
-        % get new label for previous visited segments and create spine from
-        % both matricies
-        visited = newLabels(curLabels(preVisited));
-        notVisited = curLabels(~preVisited);
-        segments(:, :, j) = ismember(segmentLabels, notVisited) + ...
-          ismember(newSpines, visited);
-        segments(fb(i), tb(i), j) = true;
-      else
-        % create spine for segment combination
-        segments(:, :, j) = ismember(segmentLabels, curLabels);
-        segments(fb(i), tb(i), j) = true;
-      end
-      gof(j) = calcAdjRsquared( segments(:, :, j) );
+  for j = 1:numPaths
+    nodes = paths(j, :);
+    nodes = nodes(nodes > 0);
+    pathMask = zeros(size(skelLabelIds));
+    % find the bpoints in the path and add to mask
+    pathBpointLabels = nodes(ismember(nodes, 1:numBpointLabels) == 1);
+    for k = 1:numel(pathBpointLabels)
+      pathMask(bpointLabels == pathBpointLabels(k)) = 1;
     end
 
-    % pick combo with highest goodness of fit
-    [~, maxGof] = max(gof);
-
-    % increment number of new spines if no segment in the pair has been
-    % used before
-    if nnz(visitedSegments(combos(maxGof, :))) == 0
-      numNewSpines = numNewSpines + 1;
-      newSpines(segments(:, :, maxGof) == 1) = numNewSpines;
-      newLabels(combos(maxGof, :)) = numNewSpines;
-    else
-      label = max(max(newSpines .* segments(:, :, maxGof)));
-      newSpines(segments(:, :, maxGof) == 1) = label;
-      newLabels(combos(maxGof, :)) = label;
+    for k = 1:numel(nodes) - 1
+      % get the segment id from the adjacency matrix
+      segment = adjMatrix(nodes(k), nodes(k + 1));
+      pathMask(skelLabelIds == segment) = 1;
     end
 
-    unusedSegment = curBpointInfo(~ismember(adjSegments, combos(maxGof, :)), 1);
-    isSpur = curBpointInfo(~ismember(adjSegments, combos(maxGof, :)), 2);
-    visitedSegments(adjSegments) = true;
-
-    % if unused segment is not a spur, mark it as unvisited otherwise
-    % change its label
-    if ~isSpur
-      visitedSegments(unusedSegment) = false;
-    else
-      newLabels(unusedSegment) = NaN;
+    pathMasks(j, :, :) = pathMask;
+    % average distance transform values
+    pathDist = pathMask .* dist;
+    pathDist = pathDist(:);
+    pathDist(isnan(pathDist)) = [];
+    pathDist(pathDist == 0) = [];
+    pathInfo(j, 1) = mean(pathDist);
+    % measure of fit
+    rbar = calcAdjRsquared(pathMask, 3);
+    if rbar < -100
+      rbar = -inf;
     end
+    pathInfo(j, 2) = rbar;
+    [~, pathFit1] = calcAdjRsquared(pathMask, 1);
+    pathAngle = atand(pathFit1(1));
+    pathInfo(j, 3) = pathAngle;
   end
+end
 
-  %------------------------------------------------------------------------
-  % Final step is to decide if bridge segments will be used. ?????????????
-  curBpoints = find(visitedBpoints == 0);
-    
-  for i = curBpoints'
-    curBpointInfo = bpointInfo(:, :, i);
-    adjSegments = curBpointInfo(:, 1);
-    adjSegments = adjSegments(adjSegments > 0);
-    % mark branch point as visited
-    visitedBpoints(i) = true;
-      
-    % find each combination of branches
-    combos = combnk(adjSegments, 2);
-      
-    % preallocate for each combination
-    segments = zeros(size(segmentLabels,1), ...
-      size(segmentLabels,2), numel(adjSegments));
-
-    % find goodness of fit for each combination
-    gof = zeros(size(combos, 1), 1);
-    for j = 1:numel(gof)
-      % check if either segment has been included in a previous spine
-      curLabels = combos(j, :);
-      preVisited = visitedSegments(curLabels);
-      if nnz(preVisited) > 0
-        % get new label for previous visited segments and create spine from
-        % both matricies
-        visited = newLabels(curLabels(preVisited));
-        notVisited = curLabels(~preVisited);
-        segments(:, :, j) = ismember(segmentLabels, notVisited) + ...
-          ismember(newSpines, visited);
-        segments(fb(i), tb(i), j) = true;
-      else
-        % create spine for segment combination
-        segments(:, :, j) = ismember(segmentLabels, curLabels);
-        segments(fb(i), tb(i), j) = true;
-      end
-      gof(j) = calcAdjRsquared( segments(:, :, j) );
-    end
-    
-    % pick combo with highest goodness of fit
-    [~, maxGof] = max(gof);
- 
-    % increment number of new spines if no segment in the pair has been
-    % used before
-    if nnz(visitedSegments(combos(maxGof, :))) == 0
-      numNewSpines = numNewSpines + 1;
-      newSpines(segments(:, :, maxGof) == 1) = numNewSpines;
-      newLabels(combos(maxGof, :)) = numNewSpines;
-    else
-      label = max(max(newSpines .* segments(:, :, maxGof)));
-      newSpines(segments(:, :, maxGof) == 1) = label;
-      newLabels(combos(maxGof, :)) = label;
-    end
-
-    unusedSegment = curBpointInfo(~ismember(adjSegments, combos(maxGof, :)), 1);
-    visitedSegments(adjSegments) = true;
-    newLabels(unusedSegment) = NaN;
-  
-  end
-
-    
 %--------------------------------------------------------------------------
 % calcAdjRsquared
 % Input: spine - binary matrix
 % Output: gof - adjusted r squared value
 %       p - polynomial describing line of best fit
 %--------------------------------------------------------------------------
-  function [rbarSquared, p] = calcAdjRsquared( spine )
-    [fs, ts] = find(spine == 1);
-    p = polyfit(ts, fs, 1);
-    fbar = mean(fs);
-    fp = polyval(p, ts);
-    ssTot = sum((fs - fbar) .^ 2);
-    ssRes = sum((fs-fp) .^ 2);
-    rsquared = 1 - (ssRes / ssTot);
-    rbarSquared = 1 - (1 - rsquared) * ( (numel(fs) - 1) / (numel(fs) - 2));
+function [rbarSquared, p] = calcAdjRsquared( spine, degree )
+  [fs, ts] = find(spine == 1);
+  p = polyfit(ts, fs, degree);
+  fbar = mean(fs);
+  fp = polyval(p, ts);
+  ssTot = sum((fs - fbar) .^ 2);
+  ssRes = sum((fs-fp) .^ 2);
+  rsquared = 1 - (ssRes / ssTot);
+  rbarSquared = 1 - (1 - rsquared) * ( (numel(fs) - 1) / (numel(fs) - 2));
+end
+
+%--------------------------------------------------------------------------
+% removeInvalidPaths
+%
+% A path is invalid if it meets one of the following critera (1) not enough
+% data points, (2) poor measure of fit, (3) the points do not span a large
+% enough distance in time or frequency, (4) the angle of the path, 
+% approximated by a 1st degree fit, is less than 10 degrees. a shallower
+% angle is used since the 1st degree fit can depress the value. (5) the 
+% path includes large differences in angles between segments (6) The path
+% spans 100 or more points in time. this limitation is imposed by the
+% structure of the cdf file
+%--------------------------------------------------------------------------
+function [paths, pathInfo, numPaths, pathMasks] = removeInvalidPaths(paths, pathInfo, numPaths, pathMasks, adjMatrix, edges)
+  % remove paths that have a negative measure of fit. this indicates that
+  % overfitting has occured. for a polynomial fit of degree 3, this
+  % indicates less than 4 points
+  % remove paths that have a measure of fit less than .80
+  invalidPaths = false(numPaths, 1); %#ok<PREALL>
+  invalidPaths = pathInfo(:, 2) < .80;
+  % paths that have a frequency differance less than 5 or are only 1 pixel
+  % wide are removed or have an approximate angle less than 10 degrees
+  for i = 1:numPaths
+    if ~invalidPaths(i)
+      if abs(pathInfo(i, 3)) < 10
+        invalidPaths(i) = true;
+      else
+        pathMask = squeeze(pathMasks(i, :, :));
+        [f, t] = find(pathMask == 1);
+        if numel(unique(t)) == 1 || max(f) - min(f) < 5 || max(t) - min(t) > 99
+          invalidPaths(i) = true;
+        end
+      end
+    end
+  end
+  
+  % paths with large angle difference are removed
+  for i = 1:numPaths
+    if ~invalidPaths(i)
+      nodes = paths(i, :);
+      nodes = nodes(nodes > 0);
+      segments = zeros(numel(nodes) - 1, 1);
+      % get a list of the segments traversed in the path
+      for j = 1:numel(nodes) - 1
+        segments(j) = adjMatrix(nodes(j), nodes(j+1));
+      end
+      % compare the angle from one segment to the next. if the difference
+      % is too large, mark the path is invalid
+      segmentIndex = 1;
+      while ~invalidPaths(i) && segmentIndex < numel(segments)
+        % 90 degrees can be recorded as positive or negative. in this event
+        % set both angles to their absolute value so that a case such as
+        % -85 and 90 degrees is not rejected
+        angle1 = edges(segments(segmentIndex), 4);
+        angle2 = edges(segments(segmentIndex + 1), 4);
+        if abs(angle1) == 90 || abs(angle2) == 90
+          angle1 = abs(angle1);
+          angle2 = abs(angle2);
+        end
+        
+        if abs(angle1 - angle2) > 45
+          invalidPaths(i) = true;
+        end
+        segmentIndex = segmentIndex + 1;
+      end
+    end
+  end
+  
+  paths = paths(~invalidPaths, :);
+  pathInfo = pathInfo(~invalidPaths, :);
+  pathMasks = pathMasks(~invalidPaths, :);
+  numPaths = numPaths - sum(invalidPaths);
+end
+
+%--------------------------------------------------------------------------
+% selectPath
+%
+%
+%--------------------------------------------------------------------------
+function selectedPathIndex = selectPath(paths, numPaths, pathInfo, numBpointLabels)
+  % when finding the path with the highest average, one that begins with an 
+  % endpoint and ends with an endpoint will always be higher than a path 
+  % that continues on through the endpoint. because of this we see if there
+  % are any valid paths that begin and end with endpoints first
+  has2endpoints = false(numPaths, 1);
+  for j = 1:numPaths
+    curPath = paths(j, :);
+    curPath = curPath(curPath > 0);
+    endpoints = curPath > numBpointLabels;
+    if endpoints(1) == 1 && endpoints(end) == 1
+      has2endpoints(j) = true;
+    end
+  end
+  
+  % if there is at least one path beginning and ending with endpoints, pick
+  % the one with the highest average dist values otherwise pick any path
+  % with the highest average
+  if sum(has2endpoints) > 0
+    [maxDist, ~] = max(pathInfo(has2endpoints, 1));
+    selectedPathIndex = find(pathInfo(:, 1) == maxDist);
+  else
+    [~, selectedPathIndex] = max(pathInfo(:, 1));
   end
 end
