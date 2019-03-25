@@ -1,7 +1,7 @@
 load('r15.00_thetaphi01.00.mat')
 spect2 = spect;
 spect2(spect < -100) = -100;
-
+fspec = fspec(1:size(spect,1));
 [ridges, bw_ridges, snrMap, staggeredSnr] = find_ridges(paramfilename, spect2);
 [skel, dist, skelLabels, spines ] = findSpines(ridges);
 % [chorusElements, numChorus] = getSpinesInfo(spineLabels, numSpines, spect, mu1);

@@ -122,10 +122,6 @@ function [spineLabels, numSpineLabels] = identifySpines( skel, ridges, dist )
       % create the adjacency matrix of the segments
       [adjMatrix, bpointLabels, numBpointLabels, edges] = createAdjMatrix(skelLabelIds, numSegments, removedPoints, localBpoints, fb, tb);
       
-temp = skelLabelIds;
-temp(temp == 0) = nan;
-figure;i1=subplot(2,1,2);pcolor(temp);colormap(i1, colorcube);shading flat;c=colorbar;
-i2=subplot(2,1,1);pcolor(dist);colormap(i2, jet);shading flat;colorbar;
       % find all paths through the spine
       [paths, numPaths] = findPaths(adjMatrix, numBpointLabels);
       
@@ -474,10 +470,11 @@ function [paths, pathInfo, numPaths, pathMasks] = getPathInfo(paths, numPaths, s
     pathMask = zeros(size(skelLabelIds));
     % find the bpoints in the path and add to mask
     pathBpointLabels = nodes(ismember(nodes, 1:numBpointLabels) == 1);
+    
     for k = 1:numel(pathBpointLabels)
       pathMask(bpointLabels == pathBpointLabels(k)) = 1;
     end
-
+    
     for k = 1:numel(nodes) - 1
       % get the segment id from the adjacency matrix
       segment = adjMatrix(nodes(k), nodes(k + 1));
@@ -612,7 +609,6 @@ function selectedPathIndex = selectPath(paths, numPaths, pathInfo, numBpointLabe
       has2endpoints(j) = true;
     end
   end
-  
   % if there is at least one path beginning and ending with endpoints, pick
   % the one with the highest average dist values otherwise pick any path
   % with the highest average
@@ -620,6 +616,12 @@ function selectedPathIndex = selectPath(paths, numPaths, pathInfo, numBpointLabe
     [maxDist, ~] = max(pathInfo(has2endpoints, 1));
     selectedPathIndex = find(pathInfo(:, 1) == maxDist);
   else
-    [~, selectedPathIndex] = max(pathInfo(:, 1));
+    [maxDist, selectedPathIndex] = max(pathInfo(:, 1));
+  end
+  
+  % if more than one path is selceted, pick the one with a better fit
+  if numel(selectedPathIndex) > 1
+    [bestFit, ~] = max(pathInfo(selectedPathIndex, 2));
+    selectedPathIndex = find(pathInfo(:, 2) == bestFit & pathInfo(:, 1) == maxDist)
   end
 end
