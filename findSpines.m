@@ -1,4 +1,4 @@
-function [ skel, dist, skelLabels, spines ] = findSpines( ridges )
+function [ skel, dist, skelLabels, spines, sweeprates, chorusAngles ] = findSpines( ridges, mu )
 %UNTITLED Summary of this function goes here
 %   Detailed explanation goes here
     
@@ -9,7 +9,7 @@ function [ skel, dist, skelLabels, spines ] = findSpines( ridges )
 %   findSpinePeaks(skel, dist);
  
   % find the spine through each chorus such that there are no branch points
-  skelLabels = identifySpines( skel, ridges, dist );
+  [skelLabels, numSpineLabels, sweeprates, chorusAngles] = identifySpines( skel, ridges, dist, mu );
 
   spines = zeros(size(skelLabels));
   spines(skelLabels > 0) = 1;
@@ -87,12 +87,13 @@ end
 % Groups the peaks found into their associated chrous spines and rejects
 % those that do not meet specified criteria
 %--------------------------------------------------------------------------
-function [spineLabels, numSpineLabels] = identifySpines( skel, ridges, dist )
+function [spineLabels, numSpineLabels, sweeprates, chorusAngles] = identifySpines( skel, ridges, dist, mu )
   % initalize spine labels to a 0 valued array. the selected paths through
   % each spine will be saved to spine labels as they are found
   spineLabels = zeros(size(skel));
   numSpineLabels = 0;
-  
+  chorusAngles = [];
+  sweeprates = [];
   % created connected component labels for the peaks
   [skelLabels, numLabels] = bwlabel(skel);
   
@@ -126,7 +127,7 @@ function [spineLabels, numSpineLabels] = identifySpines( skel, ridges, dist )
       [paths, numPaths] = findPaths(adjMatrix, numBpointLabels);
       
       % get average distance transform values and quality of fit measure for each path
-      [paths, pathInfo, numPaths, pathMasks] = getPathInfo(paths, numPaths, skelLabelIds, numBpointLabels, bpointLabels, adjMatrix, dist);
+      [paths, pathInfo, numPaths, pathMasks] = getPathInfo(paths, numPaths, skelLabelIds, numBpointLabels, bpointLabels, adjMatrix, dist, mu);
       
       % remove invalid paths. an invalid path must meet one of the
       % following criteria: (1) not enough data points, (2) poor measure of
@@ -140,6 +141,7 @@ function [spineLabels, numSpineLabels] = identifySpines( skel, ridges, dist )
 
         % after finding a path, do the following
         % (1) save the path to spine labels
+        % (2) save the chorus angle and sweeprate for this path
         % (3) if this path contains a branch point, remove all paths that
         % also pass through this point, including this path
         % (4) update the path list, path info, path masks to only contain
@@ -147,6 +149,9 @@ function [spineLabels, numSpineLabels] = identifySpines( skel, ridges, dist )
         % (5) update the number of remaining paths
         numSpineLabels = numSpineLabels + 1;
         spineLabels(squeeze(pathMasks(selectedPathIndex, :, :)) == 1) = numSpineLabels;
+        chorusAngles = [chorusAngles, pathInfo(selectedPathIndex, 3)];
+        sweeprates = [sweeprates, pathInfo(selectedPathIndex, 4)];
+        
         isBpoint = paths(selectedPathIndex, :) <= numBpointLabels& paths(selectedPathIndex, : ) > 0;
         pathBpoints = paths(selectedPathIndex, isBpoint);
         containsPathBpoints = sum(ismember(paths, pathBpoints), 2) > 0;
@@ -157,12 +162,20 @@ function [spineLabels, numSpineLabels] = identifySpines( skel, ridges, dist )
 %         figure;pcolor(spineLabels);colormap colorcube;shading flat;
 %         pause;close
       end 
-      close
+%       close
     else
-      numSpineLabels = numSpineLabels + 1;
-      spineLabels(skelLabelMask == 1) = numSpineLabels;
+      [f, t] = find(skelLabelMask == 1);
+      [sweeprate, chorusAngle, ~, ~, ~, ~, ~, ~, ~, ~] = piecewise_regression(t, f, mu);
+      if max(t) - min(t) < 100 && abs(chorusAngle) > 15 && abs(chorusAngle) < 85
+        numSpineLabels = numSpineLabels + 1;
+        spineLabels(skelLabelMask == 1) = numSpineLabels;
+        chorusAngles = [chorusAngles, chorusAngle];
+        sweeprates = [sweeprates, sweeprate];
+      end
     end
   end
+  chorusAngles
+  sweeprates
   
 end
     
@@ -183,7 +196,7 @@ function [labelIds, peakLabels] = removeSpines(numLabels, peakLabels)
   for i = 1:numLabels
     peakLabelMask = (peakLabels == i);
     [fPeaks, tPeaks] = find( peakLabelMask == 1);
-    if isempty(tPeaks) || numel(unique(tPeaks)) == 1 || max(fPeaks) - min(fPeaks) < 5
+    if isempty(tPeaks) || numel(unique(tPeaks)) == 1 || max(fPeaks) - min(fPeaks) < 5 || max(tPeaks) - min(tPeaks) > 99
       peakLabels(peakLabels == i) = 0;
       removedLabels(i) = true;
     end
@@ -459,8 +472,8 @@ end
 %
 %
 %--------------------------------------------------------------------------
-% path info: [average distance transform values, measure of fit]
-function [paths, pathInfo, numPaths, pathMasks] = getPathInfo(paths, numPaths, skelLabelIds, numBpointLabels, bpointLabels, adjMatrix, dist)
+% path info: [average distance transform values, measure of fit, angle, sweeprate]
+function [paths, pathInfo, numPaths, pathMasks] = getPathInfo(paths, numPaths, skelLabelIds, numBpointLabels, bpointLabels, adjMatrix, dist, mu)
   pathInfo = zeros(numPaths, 3);
   pathMasks = zeros(numPaths, size(skelLabelIds, 1), size(skelLabelIds,2));
 
@@ -494,9 +507,12 @@ function [paths, pathInfo, numPaths, pathMasks] = getPathInfo(paths, numPaths, s
       rbar = -inf;
     end
     pathInfo(j, 2) = rbar;
-    [~, pathFit1] = calcAdjRsquared(pathMask, 1);
-    pathAngle = atand(pathFit1(1));
-    pathInfo(j, 3) = pathAngle;
+%     [~, pathFit1] = calcAdjRsquared(pathMask, 1);
+%     pathAngle = atand(pathFit1(1));
+%     pathInfo(j, 3) = pathAngle;
+    [f, t] = find(pathMask == 1);
+    [sweeprate, chorusAngle, ~, ~, ~, ~, ~, ~, ~, ~] = piecewise_regression(t, f, mu);
+    pathInfo(j, 3:4) = [chorusAngle, sweeprate];
   end
 end
 
@@ -537,10 +553,11 @@ function [paths, pathInfo, numPaths, pathMasks] = removeInvalidPaths(paths, path
   invalidPaths = false(numPaths, 1); %#ok<PREALL>
   invalidPaths = pathInfo(:, 2) < .80;
   % paths that have a frequency differance less than 5 or are only 1 pixel
-  % wide are removed or have an approximate angle less than 10 degrees
+  % wide are removed or have an approximate angle less than 15 degrees or
+  % greater than 85
   for i = 1:numPaths
     if ~invalidPaths(i)
-      if abs(pathInfo(i, 3)) < 10
+      if abs(pathInfo(i, 3)) < 15 || abs(pathInfo(i, 3)) > 85
         invalidPaths(i) = true;
       else
         pathMask = squeeze(pathMasks(i, :, :));
@@ -622,6 +639,6 @@ function selectedPathIndex = selectPath(paths, numPaths, pathInfo, numBpointLabe
   % if more than one path is selceted, pick the one with a better fit
   if numel(selectedPathIndex) > 1
     [bestFit, ~] = max(pathInfo(selectedPathIndex, 2));
-    selectedPathIndex = find(pathInfo(:, 2) == bestFit & pathInfo(:, 1) == maxDist)
+    selectedPathIndex = find(pathInfo(:, 2) == bestFit & pathInfo(:, 1) == maxDist);
   end
 end

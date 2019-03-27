@@ -1,9 +1,9 @@
 load('r15.00_thetaphi01.00.mat')
 spect2 = spect;
 spect2(spect < -100) = -100;
-fspec = fspec(1:size(spect,1));
+fspec = fspec(1:size(spect, 1));
 [ridges, bw_ridges, snrMap, staggeredSnr] = find_ridges(paramfilename, spect2);
-[skel, dist, skelLabels, spines ] = findSpines(ridges);
+[skel, dist, skelLabels, spines, sweeprates, chorusAngles ] = findSpines(ridges, mu1);
 % [chorusElements, numChorus] = getSpinesInfo(spineLabels, numSpines, spect, mu1);
 
 imagerows = 4;
@@ -163,9 +163,17 @@ hold off;
 % xlabel(i16, 'Duration of event in seconds');
 % ylabel(i16, 'Frequency (Hz)');
 
+i = i+1;
+i15=subplot(imagerows, imagecols, i);
+edges = -90:5:90;
+histogram(chorusAngles, 'BinEdges', edges);
+axis tight;
+title(i15, sprintf('(%d) Histogram of Chorus Angles', i));
+xlabel(i15, 'Chorus Angle');
+
 % render image maximized to screen
 set(gcf, 'Position', get(0, 'Screensize'));
 
 % save fig
-figname = sprintf('C:\\Users\\robin\\Desktop\\emfisis\\images\\%s.jpg', burstname);
+figname = sprintf('C:\\Users\\robin\\Desktop\\emfisis\\images\\red\\%s.jpg', burstname);
 saveas(burstimage, figname);
