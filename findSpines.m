@@ -1,4 +1,4 @@
-function [ skel, dist, skelLabels, spines, sweeprates, chorusAngles ] = findSpines( ridges, mu )
+function [ skel, dist, skelLabels, spines, sweeprates, chorusAngles ] = findSpines( ridges, mu, tspec, fspec )
 %UNTITLED Summary of this function goes here
 %   Detailed explanation goes here
     
@@ -9,7 +9,7 @@ function [ skel, dist, skelLabels, spines, sweeprates, chorusAngles ] = findSpin
 %   findSpinePeaks(skel, dist);
  
   % find the spine through each chorus such that there are no branch points
-  [skelLabels, numSpineLabels, sweeprates, chorusAngles] = identifySpines( skel, ridges, dist, mu );
+  [skelLabels, numSpineLabels, sweeprates, chorusAngles] = identifySpines( skel, dist, mu, tspec, fspec);
 
   spines = zeros(size(skelLabels));
   spines(skelLabels > 0) = 1;
@@ -87,7 +87,7 @@ end
 % Groups the peaks found into their associated chrous spines and rejects
 % those that do not meet specified criteria
 %--------------------------------------------------------------------------
-function [spineLabels, numSpineLabels, sweeprates, chorusAngles] = identifySpines( skel, ridges, dist, mu )
+function [spineLabels, numSpineLabels, sweeprates, chorusAngles] = identifySpines( skel, dist, mu, tspec, fspec )
   % initalize spine labels to a 0 valued array. the selected paths through
   % each spine will be saved to spine labels as they are found
   spineLabels = zeros(size(skel));
@@ -127,7 +127,7 @@ function [spineLabels, numSpineLabels, sweeprates, chorusAngles] = identifySpine
       [paths, numPaths] = findPaths(adjMatrix, numBpointLabels);
       
       % get average distance transform values and quality of fit measure for each path
-      [paths, pathInfo, numPaths, pathMasks] = getPathInfo(paths, numPaths, skelLabelIds, numBpointLabels, bpointLabels, adjMatrix, dist, mu);
+      [paths, pathInfo, numPaths, pathMasks] = getPathInfo(paths, numPaths, skelLabelIds, numBpointLabels, bpointLabels, adjMatrix, dist, mu, tspec, fspec);
       
       % remove invalid paths. an invalid path must meet one of the
       % following criteria: (1) not enough data points, (2) poor measure of
@@ -165,7 +165,7 @@ function [spineLabels, numSpineLabels, sweeprates, chorusAngles] = identifySpine
 %       close
     else
       [f, t] = find(skelLabelMask == 1);
-      [sweeprate, chorusAngle, ~, ~, ~, ~, ~, ~, ~, ~] = piecewise_regression(t, f, mu);
+      [sweeprate, chorusAngle, ~, ~, ~, ~, ~, ~, ~, ~] = piecewise_regression(tspec(t)', fspec(f), mu);
       if max(t) - min(t) < 100 && abs(chorusAngle) > 15 && abs(chorusAngle) < 85
         numSpineLabels = numSpineLabels + 1;
         spineLabels(skelLabelMask == 1) = numSpineLabels;
@@ -473,7 +473,7 @@ end
 %
 %--------------------------------------------------------------------------
 % path info: [average distance transform values, measure of fit, angle, sweeprate]
-function [paths, pathInfo, numPaths, pathMasks] = getPathInfo(paths, numPaths, skelLabelIds, numBpointLabels, bpointLabels, adjMatrix, dist, mu)
+function [paths, pathInfo, numPaths, pathMasks] = getPathInfo(paths, numPaths, skelLabelIds, numBpointLabels, bpointLabels, adjMatrix, dist, mu, tspec, fspec)
   pathInfo = zeros(numPaths, 3);
   pathMasks = zeros(numPaths, size(skelLabelIds, 1), size(skelLabelIds,2));
 
@@ -511,7 +511,7 @@ function [paths, pathInfo, numPaths, pathMasks] = getPathInfo(paths, numPaths, s
 %     pathAngle = atand(pathFit1(1));
 %     pathInfo(j, 3) = pathAngle;
     [f, t] = find(pathMask == 1);
-    [sweeprate, chorusAngle, ~, ~, ~, ~, ~, ~, ~, ~] = piecewise_regression(t, f, mu);
+    [sweeprate, chorusAngle, ~, ~, ~, ~, ~, ~, ~, ~] = piecewise_regression(tspec(t)', fspec(f), mu);
     pathInfo(j, 3:4) = [chorusAngle, sweeprate];
   end
 end

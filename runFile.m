@@ -3,7 +3,7 @@ spect2 = spect;
 spect2(spect < -100) = -100;
 fspec = fspec(1:size(spect, 1));
 [ridges, bw_ridges, snrMap, staggeredSnr] = find_ridges(paramfilename, spect2);
-[skel, dist, skelLabels, spines, sweeprates, chorusAngles ] = findSpines(ridges, mu1);
+[skel, dist, skelLabels, spines, sweeprates, chorusAngles ] = findSpines(ridges, mu1, tspec, fspec);
 % [chorusElements, numChorus] = getSpinesInfo(spineLabels, numSpines, spect, mu1);
 
 imagerows = 4;
@@ -175,5 +175,5 @@ xlabel(i15, 'Chorus Angle');
 set(gcf, 'Position', get(0, 'Screensize'));
 
 % save fig
-figname = sprintf('C:\\Users\\robin\\Desktop\\emfisis\\images\\red\\%s.jpg', burstname);
+figname = sprintf('C:\\Users\\robin\\Desktop\\emfisis\\images\\gold\\%s.jpg', burstname);
 saveas(burstimage, figname);
