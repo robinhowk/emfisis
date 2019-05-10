@@ -43,17 +43,17 @@ pcolor(tspec, fspec, refinedSnrMap);colormap(i13, jet);shading flat;colorbar;
 title(sprintf('(%d) Refined SNR Map of Detected Features\nSNR > 50, Must exceed time threshold', h));
 xlabel('Duration of event (in seconds)');ylabel('Frequency (Hz)');
 
-h=h+1;
-i12=subplot(4,3,h);
-pcolor(tspec, fspec, refinedFeatures);colormap(i12, jet);shading flat;caxis([-100 -30]);colorbar;
-title(sprintf('(%d) Refined Features With Additional SNR Filtering', h));
-xlabel('Duration of event (in seconds)');ylabel('Frequency (Hz)');
-
 % h=h+1;
 % i13=subplot(4,3,h);
 % pcolor(tspec, fspec, filteredRidges);colormap(i13, jet);shading flat;colorbar;
 % title(sprintf('(%d) Detected Features Using Radon Filtering', h));
 % xlabel('Duration of event (in seconds)');ylabel('Frequency (Hz)');
+
+h=h+1;
+i12=subplot(4,3,h);
+pcolor(tspec, fspec, refinedFeatures);colormap(i12, jet);shading flat;caxis([-100 -30]);colorbar;
+title(sprintf('(%d) Refined Features With Additional SNR Filtering', h));
+xlabel('Duration of event (in seconds)');ylabel('Frequency (Hz)');
 
 % h=h+1;
 % subplot(4,3,h);pcolor(tspec, fspec, dist);colormap jet;shading flat;colorbar;
