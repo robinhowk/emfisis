@@ -7,7 +7,7 @@ for iFile = 1:size(filelist, 1)
   % change this to the local folder path on your device
   filenamenew = sprintf('/run/media/rhowk/SANDISK/emfisis/source files/gold/%s', filename);
   load(filenamenew);
-  dstPeaksConvexHull;
+  convexHullsScript;
 %   numChorus
   clearvars -except filelist
 end

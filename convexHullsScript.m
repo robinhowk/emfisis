@@ -9,7 +9,7 @@ spect2(spect < -100) = -100;
 fspec = fspec(1:size(spect, 1));
 [ridges, bwRidges, snrMap, staggeredSnr] = find_ridges(spect2, r);
 [refinedSnrMap, refinedFeatures, bwRidges] = refinedSnrFiltering(ridges, bwRidges, 15);
-[filteredRidges, bwRidges] = filterRadonAngles(refinedFeatures);
+% [filteredRidges, bwRidges] = filterRadonAngles(refinedFeatures);
 % [ dist, peaks, featureLabels, numPeaks ] = findDstPeaks( bwRidges, ridges );
 [featureLabels, numPeaks] = bwlabel(bwRidges);
 convexHulls = getConvexHulls(featureLabels, numPeaks);
@@ -49,11 +49,11 @@ pcolor(tspec, fspec, refinedFeatures);colormap(i12, jet);shading flat;caxis([-10
 title(sprintf('(%d) Refined Features With Additional SNR Filtering', h));
 xlabel('Duration of event (in seconds)');ylabel('Frequency (Hz)');
 
-h=h+1;
-i13=subplot(4,3,h);
-pcolor(tspec, fspec, filteredRidges);colormap(i13, jet);shading flat;colorbar;
-title(sprintf('(%d) Detected Features Using Radon Filtering', h));
-xlabel('Duration of event (in seconds)');ylabel('Frequency (Hz)');
+% h=h+1;
+% i13=subplot(4,3,h);
+% pcolor(tspec, fspec, filteredRidges);colormap(i13, jet);shading flat;colorbar;
+% title(sprintf('(%d) Detected Features Using Radon Filtering', h));
+% xlabel('Duration of event (in seconds)');ylabel('Frequency (Hz)');
 
 % h=h+1;
 % subplot(4,3,h);pcolor(tspec, fspec, dist);colormap jet;shading flat;colorbar;
